@@ -1,0 +1,375 @@
+"use client"
+
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Bell,
+  Search,
+  Plus,
+  MessageSquare,
+  Trophy,
+  BookOpen,
+  Users,
+  TrendingUp,
+  LogOut,
+  Settings,
+  Calendar,
+} from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { DiscussionForums } from "@/components/forums/discussion-forums"
+import { KnowledgeBase } from "@/components/knowledge/knowledge-base"
+import { Leaderboard } from "@/components/gamification/leaderboard"
+import { AdminDashboard } from "@/components/admin/admin-dashboard"
+import { EventsPortal } from "@/components/events/events-portal"
+import { WelcomePopup } from "@/components/ui/welcome-popup"
+
+interface CommunityDashboardProps {
+  user: any
+  onLogout: () => void
+}
+
+export function CommunityDashboard({ user, onLogout }: CommunityDashboardProps) {
+  const [activeTab, setActiveTab] = useState("feed")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [showWelcomePopup, setShowWelcomePopup] = useState(true)
+
+  const isAdmin = user.email === "samuel@xerago.com"
+
+  const feedActivities = [
+    {
+      id: "1",
+      type: "article",
+      title: "New Article: AI in Marketing Automation",
+      author: "Sarah Chen",
+      department: "Marketing",
+      timestamp: "2 hours ago",
+      description: "Shared insights on implementing AI-powered marketing automation",
+      engagement: { likes: 12, comments: 5 },
+    },
+    {
+      id: "2",
+      type: "event",
+      title: "Upcoming Event: Data Analytics Workshop",
+      author: "Mike Rodriguez",
+      department: "Digital Analytics",
+      timestamp: "4 hours ago",
+      description: "Created a new workshop on advanced analytics techniques",
+      engagement: { attendees: 18, interested: 25 },
+    },
+    {
+      id: "3",
+      type: "discussion",
+      title: "Hot Discussion: Best CMS Migration Practices",
+      author: "Emily Johnson",
+      department: "CMS",
+      timestamp: "6 hours ago",
+      description: "Started a discussion about successful migration strategies",
+      engagement: { replies: 8, participants: 12 },
+    },
+    {
+      id: "4",
+      type: "achievement",
+      title: "Achievement Unlocked: Knowledge Contributor",
+      author: "Lisa Wang",
+      department: "AI Engineering",
+      timestamp: "1 day ago",
+      description: "Earned the Knowledge Contributor badge for sharing 5 articles",
+      engagement: { congratulations: 15 },
+    },
+  ]
+
+  const getActivityIcon = (type: string) => {
+    switch (type) {
+      case "article":
+        return <BookOpen className="w-4 h-4" />
+      case "event":
+        return <Calendar className="w-4 h-4" />
+      case "discussion":
+        return <MessageSquare className="w-4 h-4" />
+      case "achievement":
+        return <Trophy className="w-4 h-4" />
+      default:
+        return <TrendingUp className="w-4 h-4" />
+    }
+  }
+
+  const getActivityColor = (type: string) => {
+    switch (type) {
+      case "article":
+        return "bg-emerald-100 text-emerald-700"
+      case "event":
+        return "bg-green-100 text-green-700"
+      case "discussion":
+        return "bg-teal-100 text-teal-700"
+      case "achievement":
+        return "bg-yellow-100 text-yellow-700"
+      default:
+        return "bg-gray-100 text-gray-700"
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      {showWelcomePopup && <WelcomePopup userName={user.name} onClose={() => setShowWelcomePopup(false)} />}
+
+      {/* Header */}
+      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div
+                className="w-10 h-10 rounded-lg flex items-center justify-center shadow-md border border-emerald-500/20"
+                style={{ background: "linear-gradient(to right, #249e5e, #16a34a)" }}
+              >
+                <span className="text-lg font-bold text-gray-900">XM</span>
+              </div>
+              <div>
+                <h1 className="text-xl font-bold">Xerago Martech Minds</h1>
+                <p className="text-sm text-muted-foreground">Internal Community Portal</p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-4">
+              <div className="relative hidden md:block">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  placeholder="Search discussions, knowledge..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 w-64"
+                />
+              </div>
+
+              <Button variant="ghost" size="icon">
+                <Bell className="w-5 h-5" />
+              </Button>
+
+              <div className="flex items-center space-x-3">
+                <Avatar className="w-8 h-8">
+                  <AvatarFallback>
+                    {user.name
+                      .split(" ")
+                      .map((n: string) => n[0])
+                      .join("")}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="hidden md:block">
+                  <p className="text-sm font-medium">{user.name}</p>
+                  <p className="text-xs text-muted-foreground">{user.department}</p>
+                </div>
+                <Button variant="ghost" size="icon" onClick={onLogout}>
+                  <LogOut className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <div className="container mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Sidebar */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* User Stats */}
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center space-x-3">
+                  <Avatar className="w-12 h-12">
+                    <AvatarFallback>
+                      {user.name
+                        .split(" ")
+                        .map((n: string) => n[0])
+                        .join("")}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h3 className="font-semibold">{user.name}</h3>
+                    <p className="text-sm text-muted-foreground">{user.department}</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Points</span>
+                  <Badge
+                    variant="secondary"
+                    className="bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700"
+                  >
+                    {user.points}
+                  </Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Level</span>
+                  <Badge variant="outline">Level {user.level}</Badge>
+                </div>
+                <div className="space-y-2">
+                  <span className="text-sm">Badges</span>
+                  <div className="flex flex-wrap gap-1">
+                    {user.badges.map((badge: string, index: number) => (
+                      <Badge key={index} variant="secondary" className="text-xs">
+                        {badge}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Quick Actions */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start bg-transparent"
+                  size="sm"
+                  onClick={() => setActiveTab("forums")}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Discussion
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start bg-transparent"
+                  size="sm"
+                  onClick={() => setActiveTab("knowledge")}
+                >
+                  <BookOpen className="w-4 h-4 mr-2" />
+                  Share Knowledge
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start bg-transparent"
+                  size="sm"
+                  onClick={() => setActiveTab("events")}
+                >
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Upcoming Events
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start bg-transparent"
+                  size="sm"
+                  onClick={() => setActiveTab("leaderboard")}
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  Find Colleagues
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Main Content Area */}
+          <div className="lg:col-span-3">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+              <TabsList className={`grid w-full ${isAdmin ? "grid-cols-6" : "grid-cols-5"}`}>
+                <TabsTrigger value="feed" className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4" />
+                  <span className="hidden sm:inline">Feed</span>
+                </TabsTrigger>
+                <TabsTrigger value="forums" className="flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4" />
+                  <span className="hidden sm:inline">Forums</span>
+                </TabsTrigger>
+                <TabsTrigger value="knowledge" className="flex items-center gap-2">
+                  <BookOpen className="w-4 h-4" />
+                  <span className="hidden sm:inline">Knowledge</span>
+                </TabsTrigger>
+                <TabsTrigger value="events" className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4" />
+                  <span className="hidden sm:inline">Events</span>
+                </TabsTrigger>
+                <TabsTrigger value="leaderboard" className="flex items-center gap-2">
+                  <Trophy className="w-4 h-4" />
+                  <span className="hidden sm:inline">Leaderboard</span>
+                </TabsTrigger>
+                {isAdmin && (
+                  <TabsTrigger value="admin" className="flex items-center gap-2">
+                    <Settings className="w-4 h-4" />
+                    <span className="hidden sm:inline">Admin</span>
+                  </TabsTrigger>
+                )}
+              </TabsList>
+
+              <TabsContent value="feed" className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">Community Feed</h3>
+                    <Badge variant="secondary">Latest Activity</Badge>
+                  </div>
+
+                  <div className="space-y-4">
+                    {feedActivities.map((activity) => (
+                      <Card key={activity.id} className="hover:shadow-md transition-shadow">
+                        <CardContent className="p-4">
+                          <div className="flex items-start space-x-3">
+                            <div className={`p-2 rounded-full ${getActivityColor(activity.type)}`}>
+                              {getActivityIcon(activity.type)}
+                            </div>
+                            <div className="flex-1 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-medium text-sm">{activity.title}</h4>
+                                <span className="text-xs text-muted-foreground">{activity.timestamp}</span>
+                              </div>
+                              <p className="text-sm text-muted-foreground">{activity.description}</p>
+                              <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+                                <span className="font-medium">{activity.author}</span>
+                                <span>•</span>
+                                <span>{activity.department}</span>
+                                <span>•</span>
+                                <div className="flex items-center space-x-2">
+                                  {activity.engagement.likes && <span>{activity.engagement.likes} likes</span>}
+                                  {activity.engagement.comments && <span>{activity.engagement.comments} comments</span>}
+                                  {activity.engagement.attendees && (
+                                    <span>{activity.engagement.attendees} attendees</span>
+                                  )}
+                                  {activity.engagement.replies && <span>{activity.engagement.replies} replies</span>}
+                                  {activity.engagement.congratulations && (
+                                    <span>{activity.engagement.congratulations} congratulations</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="forums">
+                <DiscussionForums user={user} />
+              </TabsContent>
+
+              <TabsContent value="knowledge">
+                <KnowledgeBase user={user} />
+              </TabsContent>
+
+              <TabsContent value="events">
+                <EventsPortal user={user} />
+              </TabsContent>
+
+              <TabsContent value="leaderboard">
+                <Leaderboard currentUser={user} />
+              </TabsContent>
+
+              {isAdmin && (
+                <TabsContent value="admin">
+                  <AdminDashboard currentUser={user} />
+                </TabsContent>
+              )}
+            </Tabs>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
