@@ -1,15 +1,36 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  AwaitedReactNode,
+  JSXElementConstructor,
+  Key,
+  ReactElement,
+  ReactNode,
+  ReactPortal,
+  useEffect,
+  useState,
+} from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Calendar,
   Plus,
@@ -22,97 +43,25 @@ import {
   Coffee,
   Presentation,
   Trophy,
-} from "lucide-react"
+} from "lucide-react";
 
-// Mock events data
-const mockEvents = [
-  {
-    id: "1",
-    title: "AI in Marketing: Future Trends Workshop",
-    description:
-      "Join us for an interactive workshop exploring the latest AI trends in marketing automation, personalization, and customer analytics. Learn practical applications and get hands-on experience with cutting-edge tools.",
-    organizer: {
-      name: "Sarah Chen",
-      department: "Marketing",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=sarah",
-    },
-    date: "2024-01-25T14:00:00Z",
-    endDate: "2024-01-25T16:00:00Z",
-    location: "Conference Room A / Virtual",
-    type: "Workshop",
-    category: "AI & Innovation",
-    attendees: 24,
-    maxAttendees: 30,
-    isRegistered: true,
-    tags: ["AI", "Marketing", "Workshop", "Hands-on"],
-    status: "upcoming",
-  },
-  {
-    id: "2",
-    title: "Data Analytics Best Practices Lunch & Learn",
-    description:
-      "Casual lunch session discussing best practices in data analytics, dashboard design, and reporting strategies. Bring your questions and real-world challenges!",
-    organizer: {
-      name: "Mike Rodriguez",
-      department: "Digital Analytics",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=mike",
-    },
-    date: "2024-01-22T12:00:00Z",
-    endDate: "2024-01-22T13:00:00Z",
-    location: "Cafeteria",
-    type: "Lunch & Learn",
-    category: "Analytics",
-    attendees: 18,
-    maxAttendees: 25,
-    isRegistered: false,
-    tags: ["Analytics", "Best Practices", "Casual", "Q&A"],
-    status: "upcoming",
-  },
-  {
-    id: "3",
-    title: "CMS Migration Success Stories",
-    description:
-      "Team members share their experiences and lessons learned from recent CMS migration projects. Great opportunity to learn from real implementations.",
-    organizer: {
-      name: "Emily Johnson",
-      department: "CMS",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=emily",
-    },
-    date: "2024-01-18T15:30:00Z",
-    endDate: "2024-01-18T16:30:00Z",
-    location: "Virtual Meeting",
-    type: "Presentation",
-    category: "Technology",
-    attendees: 15,
-    maxAttendees: 20,
-    isRegistered: true,
-    tags: ["CMS", "Migration", "Case Studies", "Virtual"],
-    status: "completed",
-  },
-  {
-    id: "4",
-    title: "Monthly Team Building: Escape Room Challenge",
-    description:
-      "Join us for a fun team building activity! Work together to solve puzzles and escape themed rooms. Great way to bond with colleagues from different departments.",
-    organizer: {
-      name: "HR Team",
-      department: "Human Resources",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=hr",
-    },
-    date: "2024-01-30T17:00:00Z",
-    endDate: "2024-01-30T19:00:00Z",
-    location: "Escape Quest Downtown",
-    type: "Team Building",
-    category: "Social",
-    attendees: 32,
-    maxAttendees: 40,
-    isRegistered: false,
-    tags: ["Team Building", "Fun", "Cross-department", "After Hours"],
-    status: "upcoming",
-  },
-]
+import {
+  getEvents,
+  createEvent as apiCreateEvent,
+  toggleRsvp,
+} from "@/lib/api";
 
-const eventTypes = ["Workshop", "Lunch & Learn", "Presentation", "Team Building", "Conference", "Training"]
+// start with empty; populate via API
+const mockEvents: any[] = [];
+
+const eventTypes = [
+  "Workshop",
+  "Lunch & Learn",
+  "Presentation",
+  "Team Building",
+  "Conference",
+  "Training",
+];
 const eventCategories = [
   "AI & Innovation",
   "Analytics",
@@ -120,19 +69,19 @@ const eventCategories = [
   "Marketing",
   "Social",
   "Professional Development",
-]
+];
 
 interface EventsPortalProps {
-  user: any
+  user: any;
 }
 
 export function EventsPortal({ user }: EventsPortalProps) {
-  const [events, setEvents] = useState(mockEvents)
-  const [selectedCategory, setSelectedCategory] = useState("all")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [sortBy, setSortBy] = useState("date")
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState("all")
+  const [events, setEvents] = useState<any[]>(mockEvents);
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState("date");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("all");
   const [newEvent, setNewEvent] = useState({
     title: "",
     description: "",
@@ -143,73 +92,84 @@ export function EventsPortal({ user }: EventsPortalProps) {
     category: "",
     maxAttendees: "",
     tags: "",
-  })
+  });
 
-  const isAdmin = user.email === "samuel@xerago.com"
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await getEvents();
+        setEvents(res.data.events || []);
+      } catch (e) {
+        // swallow for now; UI stays empty
+      }
+    })();
+  }, []);
+
+  const isAdmin = user.email === "samuel@xerago.com";
 
   const filteredEvents = events.filter((event) => {
-    const matchesCategory = selectedCategory === "all" || event.category === selectedCategory
+    const matchesCategory =
+      selectedCategory === "all" || event.category === selectedCategory;
     const matchesSearch =
       searchQuery === "" ||
       event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       event.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      event.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+      event.tags.some((tag: string) =>
+        tag.toLowerCase().includes(searchQuery.toLowerCase())
+      );
 
     const matchesTab =
       activeTab === "all" ||
       (activeTab === "registered" && event.isRegistered) ||
-      (activeTab === "my-events" && event.organizer.name === user.name)
+      (activeTab === "my-events" && event.organizer.name === user.name);
 
-    return matchesCategory && matchesSearch && matchesTab
-  })
+    return matchesCategory && matchesSearch && matchesTab;
+  });
 
   const sortedEvents = [...filteredEvents].sort((a, b) => {
     if (sortBy === "date") {
-      return new Date(a.date).getTime() - new Date(b.date).getTime()
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
     } else if (sortBy === "popular") {
-      return b.attendees - a.attendees
+      return b.attendees - a.attendees;
     }
-    return 0
-  })
+    return 0;
+  });
 
-  const handleRegister = (eventId: string) => {
-    setEvents(
-      events.map((event) =>
-        event.id === eventId
-          ? {
-              ...event,
-              attendees: event.isRegistered ? event.attendees - 1 : event.attendees + 1,
-              isRegistered: !event.isRegistered,
-            }
-          : event,
-      ),
+  const handleRegister = async (eventId: string) => {
+    try {
+      const res = await toggleRsvp(eventId);
+      const updated = res.data.event;
+      setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+    } catch {}
+  };
+
+  const handleCreateEvent = async () => {
+    if (
+      !newEvent.title ||
+      !newEvent.description ||
+      !newEvent.date ||
+      !newEvent.location
     )
-  }
+      return;
 
-  const handleCreateEvent = () => {
-    if (!newEvent.title || !newEvent.description || !newEvent.date || !newEvent.location) return
-
-    const event = {
-      id: Date.now().toString(),
+    const payload = {
       title: newEvent.title,
       description: newEvent.description,
-      organizer: { name: user.name, department: user.department, avatar: user.avatar },
       date: newEvent.date,
       endDate: newEvent.endDate || newEvent.date,
       location: newEvent.location,
       type: newEvent.type,
       category: newEvent.category,
-      attendees: 1,
-      maxAttendees: Number.parseInt(newEvent.maxAttendees) || 50,
-      isRegistered: true,
-      tags: newEvent.tags
-        .split(",")
-        .map((tag) => tag.trim())
-        .filter(Boolean),
-      status: "upcoming",
-    }
+      maxAttendees: newEvent.maxAttendees,
+      tags: newEvent.tags,
+    };
 
-    setEvents([event, ...events])
+    try {
+      const res = await apiCreateEvent(payload);
+      const created = res.data.event;
+      setEvents((prev) => [created, ...prev]);
+    } catch {}
+
     setNewEvent({
       title: "",
       description: "",
@@ -220,48 +180,48 @@ export function EventsPortal({ user }: EventsPortalProps) {
       category: "",
       maxAttendees: "",
       tags: "",
-    })
-    setIsCreateDialogOpen(false)
-  }
+    });
+    setIsCreateDialogOpen(false);
+  };
 
   const formatEventDate = (dateString: string) => {
-    const date = new Date(dateString)
+    const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
       weekday: "short",
       month: "short",
       day: "numeric",
       hour: "numeric",
       minute: "2-digit",
-    })
-  }
+    });
+  };
 
   const getEventTypeIcon = (type: string) => {
     switch (type) {
       case "Workshop":
-        return <Presentation className="w-4 h-4" />
+        return <Presentation className="w-4 h-4" />;
       case "Lunch & Learn":
-        return <Coffee className="w-4 h-4" />
+        return <Coffee className="w-4 h-4" />;
       case "Team Building":
-        return <Trophy className="w-4 h-4" />
+        return <Trophy className="w-4 h-4" />;
       case "Presentation":
-        return <Video className="w-4 h-4" />
+        return <Video className="w-4 h-4" />;
       default:
-        return <Calendar className="w-4 h-4" />
+        return <Calendar className="w-4 h-4" />;
     }
-  }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "upcoming":
-        return "bg-green-100 text-green-700"
+        return "bg-green-100 text-green-700";
       case "completed":
-        return "bg-gray-100 text-gray-700"
+        return "bg-gray-100 text-gray-700";
       case "cancelled":
-        return "bg-red-100 text-red-700"
+        return "bg-red-100 text-red-700";
       default:
-        return "bg-blue-100 text-blue-700"
+        return "bg-blue-100 text-blue-700";
     }
-  }
+  };
 
   const categories = [
     { id: "all", name: "All Categories", count: events.length },
@@ -270,16 +230,16 @@ export function EventsPortal({ user }: EventsPortalProps) {
       name: cat,
       count: events.filter((e) => e.category === cat).length,
     })),
-  ]
+  ];
 
-  const registeredEvents = events.filter((event) => event.isRegistered)
-  const myEvents = events.filter((event) => event.organizer.name === user.name)
+  const registeredEvents = events.filter((event) => event.isRegistered);
+  const myEvents = events.filter((event) => event.organizer.name === user.name);
 
   const getEventStatus = (eventDate: string) => {
-    const now = new Date()
-    const eventDateTime = new Date(eventDate)
-    return eventDateTime > now ? "upcoming" : "completed"
-  }
+    const now = new Date();
+    const eventDateTime = new Date(eventDate);
+    return eventDateTime > now ? "upcoming" : "completed";
+  };
 
   return (
     <div className="space-y-6">
@@ -287,11 +247,16 @@ export function EventsPortal({ user }: EventsPortalProps) {
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Events</h2>
-          <p className="text-muted-foreground">Discover and join company events and activities</p>
+          <p className="text-muted-foreground">
+            Discover and join company events and activities
+          </p>
         </div>
 
         {isAdmin && (
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <Dialog
+            open={isCreateDialogOpen}
+            onOpenChange={setIsCreateDialogOpen}
+          >
             <DialogTrigger asChild>
               <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
                 <Plus className="w-4 h-4 mr-2" />
@@ -309,7 +274,9 @@ export function EventsPortal({ user }: EventsPortalProps) {
                     <Input
                       placeholder="Enter event title"
                       value={newEvent.title}
-                      onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                      onChange={(e) =>
+                        setNewEvent({ ...newEvent, title: e.target.value })
+                      }
                     />
                   </div>
                   <div>
@@ -317,7 +284,9 @@ export function EventsPortal({ user }: EventsPortalProps) {
                     <Input
                       placeholder="Conference Room A / Virtual"
                       value={newEvent.location}
-                      onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
+                      onChange={(e) =>
+                        setNewEvent({ ...newEvent, location: e.target.value })
+                      }
                     />
                   </div>
                 </div>
@@ -325,7 +294,12 @@ export function EventsPortal({ user }: EventsPortalProps) {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="text-sm font-medium">Type</label>
-                    <Select value={newEvent.type} onValueChange={(value) => setNewEvent({ ...newEvent, type: value })}>
+                    <Select
+                      value={newEvent.type}
+                      onValueChange={(value) =>
+                        setNewEvent({ ...newEvent, type: value })
+                      }
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
@@ -342,7 +316,9 @@ export function EventsPortal({ user }: EventsPortalProps) {
                     <label className="text-sm font-medium">Category</label>
                     <Select
                       value={newEvent.category}
-                      onValueChange={(value) => setNewEvent({ ...newEvent, category: value })}
+                      onValueChange={(value) =>
+                        setNewEvent({ ...newEvent, category: value })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select category" />
@@ -362,26 +338,39 @@ export function EventsPortal({ user }: EventsPortalProps) {
                       type="number"
                       placeholder="50"
                       value={newEvent.maxAttendees}
-                      onChange={(e) => setNewEvent({ ...newEvent, maxAttendees: e.target.value })}
+                      onChange={(e) =>
+                        setNewEvent({
+                          ...newEvent,
+                          maxAttendees: e.target.value,
+                        })
+                      }
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium">Start Date & Time</label>
+                    <label className="text-sm font-medium">
+                      Start Date & Time
+                    </label>
                     <Input
                       type="datetime-local"
                       value={newEvent.date}
-                      onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+                      onChange={(e) =>
+                        setNewEvent({ ...newEvent, date: e.target.value })
+                      }
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium">End Date & Time</label>
+                    <label className="text-sm font-medium">
+                      End Date & Time
+                    </label>
                     <Input
                       type="datetime-local"
                       value={newEvent.endDate}
-                      onChange={(e) => setNewEvent({ ...newEvent, endDate: e.target.value })}
+                      onChange={(e) =>
+                        setNewEvent({ ...newEvent, endDate: e.target.value })
+                      }
                     />
                   </div>
                 </div>
@@ -392,16 +381,22 @@ export function EventsPortal({ user }: EventsPortalProps) {
                     placeholder="Describe your event, what attendees will learn or experience..."
                     rows={4}
                     value={newEvent.description}
-                    onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
+                    onChange={(e) =>
+                      setNewEvent({ ...newEvent, description: e.target.value })
+                    }
                   />
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium">Tags (comma-separated)</label>
+                  <label className="text-sm font-medium">
+                    Tags (comma-separated)
+                  </label>
                   <Input
                     placeholder="e.g., AI, Workshop, Hands-on"
                     value={newEvent.tags}
-                    onChange={(e) => setNewEvent({ ...newEvent, tags: e.target.value })}
+                    onChange={(e) =>
+                      setNewEvent({ ...newEvent, tags: e.target.value })
+                    }
                   />
                 </div>
 
@@ -409,7 +404,10 @@ export function EventsPortal({ user }: EventsPortalProps) {
                   <Button onClick={handleCreateEvent} className="flex-1">
                     Create Event
                   </Button>
-                  <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsCreateDialogOpen(false)}
+                  >
                     Cancel
                   </Button>
                 </div>
@@ -419,8 +417,14 @@ export function EventsPortal({ user }: EventsPortalProps) {
         )}
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className={`grid w-full ${isAdmin ? "grid-cols-3" : "grid-cols-2"}`}>
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-6"
+      >
+        <TabsList
+          className={`grid w-full ${isAdmin ? "grid-cols-3" : "grid-cols-2"}`}
+        >
           <TabsTrigger value="all">All Events</TabsTrigger>
           <TabsTrigger value="registered">My Registrations</TabsTrigger>
           {isAdmin && <TabsTrigger value="my-events">My Events</TabsTrigger>}
@@ -432,7 +436,9 @@ export function EventsPortal({ user }: EventsPortalProps) {
             {categories.map((category) => (
               <Button
                 key={category.id}
-                variant={selectedCategory === category.id ? "default" : "outline"}
+                variant={
+                  selectedCategory === category.id ? "default" : "outline"
+                }
                 onClick={() => setSelectedCategory(category.id)}
                 size="sm"
               >
@@ -467,7 +473,10 @@ export function EventsPortal({ user }: EventsPortalProps) {
           {/* Events Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {sortedEvents.map((event) => (
-              <Card key={event.id} className="hover:shadow-lg transition-shadow">
+              <Card
+                key={event.id}
+                className="hover:shadow-lg transition-shadow"
+              >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center space-x-2">
@@ -475,16 +484,24 @@ export function EventsPortal({ user }: EventsPortalProps) {
                       <Badge variant="outline" className="text-xs">
                         {event.type}
                       </Badge>
-                      <Badge className={`text-xs ${getStatusColor(event.status)}`}>{event.status}</Badge>
+                      <Badge
+                        className={`text-xs ${getStatusColor(event.status)}`}
+                      >
+                        {event.status}
+                      </Badge>
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {event.attendees}/{event.maxAttendees} attending
                     </div>
                   </div>
-                  <CardTitle className="text-lg text-balance">{event.title}</CardTitle>
+                  <CardTitle className="text-lg text-balance">
+                    {event.title}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <p className="text-sm text-muted-foreground text-pretty line-clamp-2">{event.description}</p>
+                  <p className="text-sm text-muted-foreground text-pretty line-clamp-2">
+                    {event.description}
+                  </p>
 
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center space-x-2 text-muted-foreground">
@@ -498,11 +515,35 @@ export function EventsPortal({ user }: EventsPortalProps) {
                   </div>
 
                   <div className="flex flex-wrap gap-1">
-                    {event.tags.slice(0, 3).map((tag, index) => (
-                      <Badge key={index} variant="secondary" className="text-xs">
-                        #{tag}
-                      </Badge>
-                    ))}
+                    {event.tags
+                      .slice(0, 3)
+                      .map(
+                        (
+                          tag:
+                            | string
+                            | number
+                            | bigint
+                            | boolean
+                            | ReactElement<
+                                any,
+                                string | JSXElementConstructor<any>
+                              >
+                            | Iterable<ReactNode>
+                            | ReactPortal
+                            | Promise<AwaitedReactNode>
+                            | null
+                            | undefined,
+                          index: Key | null | undefined
+                        ) => (
+                          <Badge
+                            key={index}
+                            variant="secondary"
+                            className="text-xs"
+                          >
+                            #{tag}
+                          </Badge>
+                        )
+                      )}
                     {event.tags.length > 3 && (
                       <Badge variant="outline" className="text-xs">
                         +{event.tags.length - 3}
@@ -513,17 +554,24 @@ export function EventsPortal({ user }: EventsPortalProps) {
                   <div className="flex items-center justify-between pt-2 border-t">
                     <div className="flex items-center space-x-3">
                       <Avatar className="w-6 h-6">
-                        <AvatarImage src={event.organizer.avatar || "/placeholder.svg"} alt={event.organizer.name} />
+                        <AvatarImage
+                          src={event.organizer.avatar || "/placeholder.svg"}
+                          alt={event.organizer.name}
+                        />
                         <AvatarFallback className="text-xs">
                           {event.organizer.name
                             .split(" ")
-                            .map((n) => n[0])
+                            .map((n: any[]) => n[0])
                             .join("")}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="text-xs font-medium">{event.organizer.name}</p>
-                        <p className="text-xs text-muted-foreground">{event.organizer.department}</p>
+                        <p className="text-xs font-medium">
+                          {event.organizer.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {event.organizer.department}
+                        </p>
                       </div>
                     </div>
 
@@ -536,7 +584,9 @@ export function EventsPortal({ user }: EventsPortalProps) {
                         size="sm"
                         onClick={() => handleRegister(event.id)}
                         disabled={
-                          event.status === "completed" || (!event.isRegistered && event.attendees >= event.maxAttendees)
+                          event.status === "completed" ||
+                          (!event.isRegistered &&
+                            event.attendees >= event.maxAttendees)
                         }
                       >
                         {event.isRegistered ? "Registered" : "Register"}
@@ -554,15 +604,24 @@ export function EventsPortal({ user }: EventsPortalProps) {
             <Card>
               <CardContent className="text-center py-12">
                 <Calendar className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No registered events</h3>
-                <p className="text-muted-foreground mb-4">Register for events to see them here</p>
-                <Button onClick={() => setActiveTab("all")}>Browse Events</Button>
+                <h3 className="text-lg font-semibold mb-2">
+                  No registered events
+                </h3>
+                <p className="text-muted-foreground mb-4">
+                  Register for events to see them here
+                </p>
+                <Button onClick={() => setActiveTab("all")}>
+                  Browse Events
+                </Button>
               </CardContent>
             </Card>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {registeredEvents.map((event) => (
-                <Card key={event.id} className="hover:shadow-lg transition-shadow">
+                <Card
+                  key={event.id}
+                  className="hover:shadow-lg transition-shadow"
+                >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center space-x-2">
@@ -571,13 +630,19 @@ export function EventsPortal({ user }: EventsPortalProps) {
                           {event.type}
                         </Badge>
                         <Badge
-                          className={`text-xs ${getEventStatus(event.date) === "upcoming" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}`}
+                          className={`text-xs ${
+                            getEventStatus(event.date) === "upcoming"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-gray-100 text-gray-700"
+                          }`}
                         >
                           {getEventStatus(event.date)}
                         </Badge>
                       </div>
                     </div>
-                    <CardTitle className="text-lg text-balance">{event.title}</CardTitle>
+                    <CardTitle className="text-lg text-balance">
+                      {event.title}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2 text-sm">
@@ -590,7 +655,11 @@ export function EventsPortal({ user }: EventsPortalProps) {
                         <span>{event.location}</span>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm" className="w-full bg-transparent">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full bg-transparent"
+                    >
                       View Details
                     </Button>
                   </CardContent>
@@ -606,9 +675,13 @@ export function EventsPortal({ user }: EventsPortalProps) {
               <Card>
                 <CardContent className="text-center py-12">
                   <Calendar className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No events created</h3>
+                  <h3 className="text-lg font-semibold mb-2">
+                    No events created
+                  </h3>
                   <p className="text-muted-foreground mb-4">
-                    {isAdmin ? "Create your first event to get started" : "Only admin users can create events"}
+                    {isAdmin
+                      ? "Create your first event to get started"
+                      : "Only admin users can create events"}
                   </p>
                   {isAdmin && (
                     <Button onClick={() => setIsCreateDialogOpen(true)}>
@@ -621,7 +694,10 @@ export function EventsPortal({ user }: EventsPortalProps) {
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {myEvents.map((event) => (
-                  <Card key={event.id} className="hover:shadow-lg transition-shadow">
+                  <Card
+                    key={event.id}
+                    className="hover:shadow-lg transition-shadow"
+                  >
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center space-x-2">
@@ -629,13 +705,21 @@ export function EventsPortal({ user }: EventsPortalProps) {
                           <Badge variant="outline" className="text-xs">
                             {event.type}
                           </Badge>
-                          <Badge className={`text-xs ${getStatusColor(event.status)}`}>{event.status}</Badge>
+                          <Badge
+                            className={`text-xs ${getStatusColor(
+                              event.status
+                            )}`}
+                          >
+                            {event.status}
+                          </Badge>
                         </div>
                         <div className="text-xs text-muted-foreground">
                           {event.attendees}/{event.maxAttendees} attending
                         </div>
                       </div>
-                      <CardTitle className="text-lg text-balance">{event.title}</CardTitle>
+                      <CardTitle className="text-lg text-balance">
+                        {event.title}
+                      </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="space-y-2 text-sm">
@@ -649,10 +733,18 @@ export function EventsPortal({ user }: EventsPortalProps) {
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm" className="flex-1 bg-transparent">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 bg-transparent"
+                        >
                           Edit Event
                         </Button>
-                        <Button variant="outline" size="sm" className="flex-1 bg-transparent">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 bg-transparent"
+                        >
                           View Attendees
                         </Button>
                       </div>
@@ -665,5 +757,5 @@ export function EventsPortal({ user }: EventsPortalProps) {
         )}
       </Tabs>
     </div>
-  )
+  );
 }

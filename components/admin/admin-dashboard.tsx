@@ -1,6 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import axios from "axios"
+import { API_BASE_URL } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -25,62 +27,18 @@ import {
   Award,
 } from "lucide-react"
 
-// Mock admin data
 const adminStats = {
-  totalUsers: 156,
-  activeUsers: 89,
-  totalPosts: 1247,
-  totalArticles: 89,
-  pendingReports: 3,
-  newUsersThisWeek: 12,
-  engagementRate: 78,
-  averageSessionTime: "24m",
+  totalUsers: 0,
+  activeUsers: 0,
+  totalPosts: 0,
+  totalArticles: 0,
+  pendingReports: 0,
+  newUsersThisWeek: 0,
+  engagementRate: 0,
+  averageSessionTime: "0m",
 }
 
-const mockUsers = [
-  {
-    id: "1",
-    name: "Sarah Chen",
-    email: "sarah.chen@xerago.com",
-    department: "Marketing",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=sarah",
-    joinedAt: "2023-12-15",
-    lastActive: "2024-01-15T10:30:00Z",
-    status: "active",
-    points: 2450,
-    postsCount: 45,
-    articlesCount: 8,
-    role: "member",
-  },
-  {
-    id: "2",
-    name: "Mike Rodriguez",
-    email: "mike.rodriguez@xerago.com",
-    department: "Digital Analytics",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=mike",
-    joinedAt: "2023-11-20",
-    lastActive: "2024-01-14T15:45:00Z",
-    status: "active",
-    points: 2280,
-    postsCount: 38,
-    articlesCount: 12,
-    role: "moderator",
-  },
-  {
-    id: "3",
-    name: "Emily Johnson",
-    email: "emily.johnson@xerago.com",
-    department: "CMS",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=emily",
-    joinedAt: "2023-10-10",
-    lastActive: "2024-01-13T09:15:00Z",
-    status: "active",
-    points: 2150,
-    postsCount: 42,
-    articlesCount: 6,
-    role: "member",
-  },
-]
+const mockUsers: any[] = []
 
 const mockReports = [
   {
@@ -143,7 +101,7 @@ interface AdminDashboardProps {
 
 export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState("overview")
-  const [users, setUsers] = useState(mockUsers)
+  const [users, setUsers] = useState<any[]>(mockUsers)
   const [reports, setReports] = useState(mockReports)
   const [selectedUser, setSelectedUser] = useState<any>(null)
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false)
@@ -172,6 +130,31 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         return "bg-gray-100 text-gray-700 border-gray-200"
     }
   }
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const [leaderboardRes] = await Promise.all([
+          axios.get(`${API_BASE_URL}/api/leaderboard`),
+        ])
+        const lb = leaderboardRes.data?.data?.leaderboard || []
+        setUsers(lb.map((u: any) => ({
+          id: u.id,
+          name: u.name,
+          email: "",
+          department: u.department,
+          avatar: u.avatar,
+          joinedAt: new Date().toISOString(),
+          lastActive: new Date().toISOString(),
+          status: "active",
+          points: u.points,
+          postsCount: 0,
+          articlesCount: 0,
+          role: "member",
+        })))
+      } catch {}
+    })()
+  }, [])
 
   const handleReportAction = (reportId: string, action: "approve" | "reject") => {
     setReports(

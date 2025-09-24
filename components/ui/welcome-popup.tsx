@@ -20,11 +20,12 @@ export function WelcomePopup({ userName, onClose }: WelcomePopupProps) {
   }, [])
 
   const handleClose = () => {
-    setIsVisible(false)
+    setIsVisible(false);
+    localStorage.setItem("welcomePopup", "false");
     setTimeout(onClose, 300) // Wait for animation to complete
   }
 
-  if (!isVisible) return null
+  if (!isVisible || localStorage.getItem("welcomePopup") === "false") return null
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-in fade-in duration-300">

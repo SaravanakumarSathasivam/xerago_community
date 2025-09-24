@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { AwaitedReactNode, JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -26,101 +26,8 @@ import {
   Trash2,
 } from "lucide-react"
 
-// Mock knowledge articles
-const mockArticles = [
-  {
-    id: "1",
-    title: "Complete Guide to Marketing Automation with AI",
-    content:
-      "This comprehensive guide covers everything you need to know about implementing AI-powered marketing automation in your campaigns. From setup to optimization, learn the best practices that have driven 40% increase in conversion rates.",
-    author: {
-      name: "Sarah Chen",
-      department: "Marketing",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=sarah",
-    },
-    category: "Marketing",
-    type: "Guide",
-    createdAt: "2024-01-10T14:30:00Z",
-    updatedAt: "2024-01-12T09:15:00Z",
-    views: 245,
-    likes: 32,
-    bookmarks: 18,
-    tags: ["AI", "Marketing", "Automation", "Best Practices"],
-    readTime: 8,
-    difficulty: "Intermediate",
-    isBookmarked: false,
-    isLiked: true,
-  },
-  {
-    id: "2",
-    title: "Data Analytics Dashboard Setup - Step by Step",
-    content:
-      "Learn how to set up comprehensive analytics dashboards that provide actionable insights. This tutorial includes templates, best practices, and common pitfalls to avoid.",
-    author: {
-      name: "Mike Rodriguez",
-      department: "Digital Analytics",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=mike",
-    },
-    category: "Analytics",
-    type: "Tutorial",
-    createdAt: "2024-01-08T11:20:00Z",
-    updatedAt: "2024-01-08T11:20:00Z",
-    views: 189,
-    likes: 28,
-    bookmarks: 22,
-    tags: ["Analytics", "Dashboard", "Data Visualization", "Tutorial"],
-    readTime: 12,
-    difficulty: "Advanced",
-    isBookmarked: true,
-    isLiked: false,
-  },
-  {
-    id: "3",
-    title: "CMS Migration Checklist and Best Practices",
-    content:
-      "A comprehensive checklist for CMS migrations including pre-migration planning, execution steps, and post-migration optimization. Includes downloadable templates and checklists.",
-    author: {
-      name: "Emily Johnson",
-      department: "CMS",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=emily",
-    },
-    category: "Technology",
-    type: "Checklist",
-    createdAt: "2024-01-05T16:45:00Z",
-    updatedAt: "2024-01-07T10:30:00Z",
-    views: 156,
-    likes: 19,
-    bookmarks: 25,
-    tags: ["CMS", "Migration", "Checklist", "Best Practices"],
-    readTime: 6,
-    difficulty: "Intermediate",
-    isBookmarked: false,
-    isLiked: false,
-  },
-  {
-    id: "4",
-    title: "AI Tools Comparison: ChatGPT vs Claude vs Gemini",
-    content:
-      "An in-depth comparison of popular AI tools for business use. Includes pricing, features, use cases, and recommendations for different team needs.",
-    author: {
-      name: "Lisa Wang",
-      department: "AI Engineering",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=lisa",
-    },
-    category: "AI & Innovation",
-    type: "Comparison",
-    createdAt: "2024-01-03T13:15:00Z",
-    updatedAt: "2024-01-03T13:15:00Z",
-    views: 312,
-    likes: 45,
-    bookmarks: 38,
-    tags: ["AI", "Tools", "Comparison", "Business"],
-    readTime: 10,
-    difficulty: "Beginner",
-    isBookmarked: true,
-    isLiked: true,
-  },
-]
+import { getArticles, createArticle as apiCreateArticle, likeArticle, bookmarkArticle } from "@/lib/api"
+const mockArticles: any[] = []
 
 const mockPendingArticles = [
   {
@@ -160,7 +67,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [sortBy, setSortBy] = useState("recent")
-  const [articles, setArticles] = useState(mockArticles)
+  const [articles, setArticles] = useState<any[]>(mockArticles)
   const [pendingArticles, setPendingArticles] = useState(mockPendingArticles)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("browse")
@@ -173,7 +80,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
     difficulty: "Beginner",
   })
 
-  const isAdmin = user.email === "samuel@xerago.com"
+  const isAdmin = user.role === "admin"
 
   const filteredArticles = articles.filter((article) => {
     const matchesCategory = selectedCategory === "all" || article.category === selectedCategory
@@ -181,7 +88,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
       searchQuery === "" ||
       article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       article.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      article.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+      article.tags.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase()))
     return matchesCategory && matchesSearch
   })
 
@@ -196,64 +103,50 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
     return 0
   })
 
-  const handleLike = (articleId: string) => {
-    setArticles(
-      articles.map((article) =>
-        article.id === articleId
-          ? {
-              ...article,
-              likes: article.isLiked ? article.likes - 1 : article.likes + 1,
-              isLiked: !article.isLiked,
-            }
-          : article,
-      ),
-    )
+  const handleLike = async (articleId: string) => {
+    try {
+      const res = await likeArticle(articleId)
+      const updated = res.data.article
+      setArticles((prev) => prev.map((a) => (a.id === updated.id ? updated : a)))
+    } catch {}
   }
 
-  const handleBookmark = (articleId: string) => {
-    setArticles(
-      articles.map((article) =>
-        article.id === articleId
-          ? {
-              ...article,
-              bookmarks: article.isBookmarked ? article.bookmarks - 1 : article.bookmarks + 1,
-              isBookmarked: !article.isBookmarked,
-            }
-          : article,
-      ),
-    )
+  const handleBookmark = async (articleId: string) => {
+    try {
+      const res = await bookmarkArticle(articleId)
+      const updated = res.data.article
+      setArticles((prev) => prev.map((a) => (a.id === updated.id ? updated : a)))
+    } catch {}
   }
 
-  const handleCreateArticle = () => {
+  const handleCreateArticle = async () => {
     if (!newArticle.title || !newArticle.content || !newArticle.category || !newArticle.type) return
-
-    const article = {
-      id: Date.now().toString(),
+    const payload = {
       title: newArticle.title,
       content: newArticle.content,
-      author: { name: user.name, department: user.department, avatar: user.avatar },
       category: newArticle.category,
       type: newArticle.type,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      tags: newArticle.tags
-        .split(",")
-        .map((tag) => tag.trim())
-        .filter(Boolean),
-      readTime: Math.ceil(newArticle.content.split(" ").length / 200),
+      tags: newArticle.tags,
       difficulty: newArticle.difficulty,
-      status: isAdmin ? "published" : "pending",
     }
-
-    if (isAdmin) {
-      setArticles([{ ...article, views: 0, likes: 0, bookmarks: 0, isBookmarked: false, isLiked: false }, ...articles])
-    } else {
-      setPendingArticles([article, ...pendingArticles])
-    }
+    try {
+      const res = await apiCreateArticle(payload)
+      const created = res.data.article
+      setArticles((prev) => [{ ...created }, ...prev])
+    } catch {}
 
     setNewArticle({ title: "", content: "", category: "", type: "", tags: "", difficulty: "Beginner" })
     setIsCreateDialogOpen(false)
   }
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const res = await getArticles()
+        setArticles(res.data.articles || [])
+      } catch {}
+    })()
+  }, [])
 
   const handleDeleteArticle = (articleId: string) => {
     setArticles(articles.filter((article) => article.id !== articleId))
@@ -512,7 +405,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                   <p className="text-sm text-muted-foreground text-pretty line-clamp-3">{article.content}</p>
 
                   <div className="flex flex-wrap gap-1">
-                    {article.tags.slice(0, 3).map((tag, index) => (
+                    {article.tags.slice(0, 3).map((tag: string | number | bigint | boolean | ReactElement<any, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<AwaitedReactNode> | null | undefined, index: Key | null | undefined) => (
                       <Badge key={index} variant="secondary" className="text-xs">
                         #{tag}
                       </Badge>
@@ -531,7 +424,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                         <AvatarFallback className="text-xs">
                           {article.author.name
                             .split(" ")
-                            .map((n) => n[0])
+                            .map((n: any[]) => n[0])
                             .join("")}
                         </AvatarFallback>
                       </Avatar>
@@ -613,7 +506,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                           <AvatarFallback className="text-xs">
                             {article.author.name
                               .split(" ")
-                              .map((n) => n[0])
+                              .map((n: any[]) => n[0])
                               .join("")}
                           </AvatarFallback>
                         </Avatar>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { AwaitedReactNode, JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal, useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -8,93 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { Trophy, Medal, Award, Star, TrendingUp, Users, Calendar, Crown } from "lucide-react"
 
-// Mock leaderboard data
-const mockUsers = [
-  {
-    id: "1",
-    name: "Sarah Chen",
-    department: "Marketing",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=sarah",
-    points: 2450,
-    level: 8,
-    badges: ["Top Contributor", "Knowledge Sharer", "Team Player", "Innovation Leader"],
-    weeklyPoints: 180,
-    monthlyPoints: 720,
-    postsCount: 45,
-    helpfulAnswers: 32,
-    streak: 12,
-  },
-  {
-    id: "2",
-    name: "Mike Rodriguez",
-    department: "Digital Analytics",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=mike",
-    points: 2280,
-    level: 7,
-    badges: ["Data Expert", "Problem Solver", "Mentor"],
-    weeklyPoints: 165,
-    monthlyPoints: 680,
-    postsCount: 38,
-    helpfulAnswers: 28,
-    streak: 8,
-  },
-  {
-    id: "3",
-    name: "Emily Johnson",
-    department: "CMS",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=emily",
-    points: 2150,
-    level: 7,
-    badges: ["Tech Guru", "Community Builder"],
-    weeklyPoints: 145,
-    monthlyPoints: 590,
-    postsCount: 42,
-    helpfulAnswers: 25,
-    streak: 15,
-  },
-  {
-    id: "4",
-    name: "David Park",
-    department: "Product Management",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=david",
-    points: 1980,
-    level: 6,
-    badges: ["Strategic Thinker", "Collaborator"],
-    weeklyPoints: 120,
-    monthlyPoints: 480,
-    postsCount: 35,
-    helpfulAnswers: 22,
-    streak: 6,
-  },
-  {
-    id: "5",
-    name: "Lisa Wang",
-    department: "AI Engineering",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=lisa",
-    points: 1850,
-    level: 6,
-    badges: ["AI Pioneer", "Innovation Catalyst"],
-    weeklyPoints: 110,
-    monthlyPoints: 450,
-    postsCount: 28,
-    helpfulAnswers: 20,
-    streak: 9,
-  },
-  {
-    id: "6",
-    name: "Alex Thompson",
-    department: "Design",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alex",
-    points: 1720,
-    level: 5,
-    badges: ["Creative Mind", "Visual Storyteller"],
-    weeklyPoints: 95,
-    monthlyPoints: 380,
-    postsCount: 31,
-    helpfulAnswers: 18,
-    streak: 4,
-  },
-]
+import axios from "axios"
+import { API_BASE_URL } from "@/lib/api"
+// const mockUsers: any[] = []
 
 const achievements = [
   {
@@ -147,6 +63,16 @@ interface LeaderboardProps {
 
 export function Leaderboard({ currentUser }: LeaderboardProps) {
   const [activeTab, setActiveTab] = useState("overall")
+  const [users, setUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}api/leaderboard`)
+        setUsers(res.data?.data?.leaderboard || [])
+      } catch {}
+    })()
+  }, [])
 
   const getRankIcon = (rank: number) => {
     if (rank === 1) return <Crown className="w-5 h-5 text-yellow-500" />
@@ -174,7 +100,7 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
     }
   }
 
-  const currentUserRank = mockUsers.findIndex((user) => user.name === currentUser.name) + 1
+  const currentUserRank = users.findIndex((user) => user.name === currentUser.name) + 1
 
   return (
     <div className="space-y-6">
@@ -210,7 +136,7 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {mockUsers.map((user, index) => (
+                {users.map((user, index) => (
                   <div
                     key={user.id}
                     className={`flex items-center justify-between p-4 rounded-lg border ${
@@ -224,7 +150,7 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
                         <AvatarFallback>
                           {user.name
                             .split(" ")
-                            .map((n) => n[0])
+                            .map((n: any[]) => n[0])
                             .join("")}
                         </AvatarFallback>
                       </Avatar>
@@ -253,7 +179,7 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
                       <div className="text-2xl font-bold text-blue-600">{user.points.toLocaleString()}</div>
                       <div className="text-sm text-muted-foreground">points</div>
                       <div className="flex gap-1 mt-2 justify-end">
-                        {user.badges.slice(0, 2).map((badge, badgeIndex) => (
+                        {user.badges.slice(0, 2).map((badge: string | number | bigint | boolean | ReactElement<any, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<AwaitedReactNode> | null | undefined, badgeIndex: Key | null | undefined) => (
                           <Badge key={badgeIndex} variant="secondary" className="text-xs">
                             {badge}
                           </Badge>
@@ -282,7 +208,7 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {mockUsers
+                {users
                   .sort((a, b) => b.weeklyPoints - a.weeklyPoints)
                   .map((user, index) => (
                     <div
@@ -298,7 +224,7 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
                           <AvatarFallback>
                             {user.name
                               .split(" ")
-                              .map((n) => n[0])
+                              .map((n: any[]) => n[0])
                               .join("")}
                           </AvatarFallback>
                         </Avatar>
@@ -335,7 +261,7 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {mockUsers
+                {users
                   .sort((a, b) => b.monthlyPoints - a.monthlyPoints)
                   .map((user, index) => (
                     <div
@@ -353,7 +279,7 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
                           <AvatarFallback>
                             {user.name
                               .split(" ")
-                              .map((n) => n[0])
+                              .map((n: any[]) => n[0])
                               .join("")}
                           </AvatarFallback>
                         </Avatar>

@@ -3,6 +3,8 @@
 import type React from "react"
 
 import { useState } from "react"
+import { login as apiLogin, register as apiRegister } from "@/lib/api"
+import { verifyOtp, resendOtp } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,6 +26,9 @@ export function LoginForm({ onLogin }: LoginFormProps) {
   const [loading, setLoading] = useState(false)
   const [mode, setMode] = useState<"login" | "register">("login")
   const [error, setError] = useState("")
+  const [otpMode, setOtpMode] = useState(false)
+  const [otp, setOtp] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -31,39 +36,21 @@ export function LoginForm({ onLogin }: LoginFormProps) {
 
     setLoading(true)
     setError("")
-
-    // Check if user already exists
-    const existingUser = mockUsers.find((user) => user.email === email)
-    if (existingUser) {
-      setError("User with this email already exists")
+    try {
+      const res = await apiRegister({ name, email, password, department })
+      const { token, refreshToken } = res.data
+      localStorage.setItem("xerago-token", JSON.stringify(token))
+      localStorage.setItem("xerago-refresh", JSON.stringify(refreshToken))
+      // Prompt OTP verification
+      setOtpMode(true)
+      setMode("login")
+      setPassword("")
+      setError("")
+    } catch (err: any) {
+      setError(err?.message || "Registration failed")
+    } finally {
       setLoading(false)
-      return
     }
-
-    // Simulate registration delay
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    const userData = {
-      id: Math.random().toString(36).substr(2, 9),
-      email,
-      name,
-      department,
-      password,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
-      joinedAt: new Date().toISOString(),
-      points: 50, // Starting points for new users
-      level: 1,
-      badges: ["New Member"],
-    }
-
-    mockUsers.push(userData)
-    setLoading(false)
-    setMode("login")
-    setPassword("")
-    setError("")
-
-    // Show success message
-    alert("Registration successful! Please login with your credentials.")
   }
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -72,41 +59,60 @@ export function LoginForm({ onLogin }: LoginFormProps) {
 
     setLoading(true)
     setError("")
-
-    // Simulate login delay
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    if (email === "samuel@xerago.com" && password === "Test@123#") {
-      const adminUser = {
-        id: "admin-001",
-        email: "samuel@xerago.com",
-        name: "Samuel Admin",
-        department: "Digital Analytics",
-        password: "Test@123#",
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=Samuel`,
-        joinedAt: new Date().toISOString(),
-        points: 1000,
-        level: 10,
-        badges: ["Admin", "Expert", "Mentor", "Top Contributor"],
-        isAdmin: true,
+    try {
+      const res = await apiLogin({ email, password })
+      const { user, token, refreshToken } = res.data
+      localStorage.setItem("xerago-token", JSON.stringify(token))
+      localStorage.setItem("xerago-refresh", JSON.stringify(refreshToken))
+      onLogin({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        department: user.department,
+        avatar: user.avatar,
+        points: user.gamification?.points ?? 0,
+        level: user.gamification?.level ?? 1,
+        badges: user.gamification?.badges ?? [],
+        role: user.role,
+      })
+    } catch (err: any) {
+      const message = err?.message || "Invalid email or password"
+      setError(message)
+      if (/Email not verified/i.test(message)) {
+        setOtpMode(true)
       }
-      onLogin(adminUser)
+    } finally {
       setLoading(false)
-      return
     }
+  }
 
-    // Find user in mock storage
-    const user = mockUsers.find((u) => u.email === email && u.password === password)
-
-    if (!user) {
-      setError("Invalid email or password")
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email || !otp) return
+    setLoading(true)
+    setError("")
+    try {
+      await verifyOtp({ email, code: otp })
+      setOtpMode(false)
+      alert("Email verified. Please sign in.")
+    } catch (err: any) {
+      setError(err?.message || "OTP verification failed")
+    } finally {
       setLoading(false)
-      return
     }
+  }
 
-    user.isAdmin = false
-    onLogin(user)
-    setLoading(false)
+  const handleResendOtp = async () => {
+    setLoading(true)
+    setError("")
+    try {
+      await resendOtp({ email })
+      alert("OTP sent to your email")
+    } catch (err: any) {
+      setError(err?.message || "Failed to resend OTP")
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleSubmit = mode === "register" ? handleRegister : handleLogin
@@ -137,7 +143,27 @@ export function LoginForm({ onLogin }: LoginFormProps) {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={otpMode ? handleVerifyOtp : handleSubmit} className="space-y-4">
+              {otpMode && (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Enter OTP sent to your email</label>
+                    <Input
+                      type="text"
+                      placeholder="6-digit code"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value)}
+                      maxLength={6}
+                      required
+                    />
+                  </div>
+                  <div className="flex justify-between">
+                    <Button type="button" variant="ghost" onClick={handleResendOtp} disabled={loading}>
+                      Resend OTP
+                    </Button>
+                  </div>
+                </>
+              )}
               {mode === "register" && (
                 <>
                   <div className="space-y-2">
@@ -188,19 +214,31 @@ export function LoginForm({ onLogin }: LoginFormProps) {
                 />
               </div>
 
+              {!otpMode && (
               <div className="space-y-2">
                 <label htmlFor="password" className="text-sm font-medium">
                   Password
                 </label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                  <button
+                    type="button"
+                    aria-label="Toggle password visibility"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-muted-foreground"
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
               </div>
+              )}
 
               {error && <div className="text-sm text-red-600 bg-red-50 p-2 rounded-md">{error}</div>}
 
@@ -210,13 +248,7 @@ export function LoginForm({ onLogin }: LoginFormProps) {
                 style={{ background: "linear-gradient(to right, #249e5e, #16a34a)" }}
                 disabled={loading}
               >
-                {loading
-                  ? mode === "register"
-                    ? "Creating Account..."
-                    : "Signing in..."
-                  : mode === "register"
-                    ? "Create Account"
-                    : "Sign In"}
+                {loading ? (otpMode ? "Verifying..." : mode === "register" ? "Creating Account..." : "Signing in...") : otpMode ? "Verify Email" : mode === "register" ? "Create Account" : "Sign In"}
               </Button>
             </form>
 

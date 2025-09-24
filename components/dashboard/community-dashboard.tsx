@@ -37,7 +37,7 @@ export function CommunityDashboard({ user, onLogout }: CommunityDashboardProps) 
   const [searchQuery, setSearchQuery] = useState("")
   const [showWelcomePopup, setShowWelcomePopup] = useState(true)
 
-  const isAdmin = user.email === "samuel@xerago.com"
+  const isAdmin = user.role === "admin"
 
   const feedActivities = [
     {
