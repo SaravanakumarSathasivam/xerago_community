@@ -8,8 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { Trophy, Medal, Award, Star, TrendingUp, Users, Calendar, Crown } from "lucide-react"
 
-import axios from "axios"
-import { API_BASE_URL } from "@/lib/api"
+import { getLeaderboard, getLeaderboardSummary, getAchievements } from "@/lib/api"
 // const mockUsers: any[] = []
 
 const achievements = [
@@ -64,12 +63,23 @@ interface LeaderboardProps {
 export function Leaderboard({ currentUser }: LeaderboardProps) {
   const [activeTab, setActiveTab] = useState("overall")
   const [users, setUsers] = useState<any[]>([]);
+  const [weekly, setWeekly] = useState<any>({ leaderboard: [], metrics: {} })
+  const [monthly, setMonthly] = useState<any>({ leaderboard: [], metrics: {} })
+  const [availableAchievements, setAvailableAchievements] = useState<any[]>([])
 
   useEffect(() => {
     ;(async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}api/leaderboard`)
-        setUsers(res.data?.data?.leaderboard || [])
+        const res = await getLeaderboard()
+        setUsers(res.data?.leaderboard || [])
+        const [w, m, a] = await Promise.all([
+          getLeaderboardSummary('weekly'),
+          getLeaderboardSummary('monthly'),
+          getAchievements(),
+        ])
+        setWeekly(w.data)
+        setMonthly(m.data)
+        setAvailableAchievements(a.data.achievements || [])
       } catch {}
     })()
   }, [])
@@ -208,8 +218,7 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {users
-                  .sort((a, b) => b.weeklyPoints - a.weeklyPoints)
+                {weekly.leaderboard
                   .map((user, index) => (
                     <div
                       key={user.id}
@@ -241,7 +250,7 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-xl font-bold text-green-600">+{user.weeklyPoints}</div>
+                        <div className="text-xl font-bold text-green-600">+{user.points}</div>
                         <div className="text-sm text-muted-foreground">this week</div>
                       </div>
                     </div>
@@ -261,8 +270,7 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {users
-                  .sort((a, b) => b.monthlyPoints - a.monthlyPoints)
+                {monthly.leaderboard
                   .map((user, index) => (
                     <div
                       key={user.id}
@@ -296,7 +304,7 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-xl font-bold text-purple-600">+{user.monthlyPoints}</div>
+                        <div className="text-xl font-bold text-purple-600">+{user.points}</div>
                         <div className="text-sm text-muted-foreground">this month</div>
                       </div>
                     </div>
@@ -347,10 +355,7 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600">156</div>
-                    <div className="text-sm text-muted-foreground">Active Members</div>
-                  </div>
+                  {/* Placeholder counts could be wired to new summary if needed */}
                   <div className="text-center">
                     <div className="text-2xl font-bold text-orange-600">1,247</div>
                     <div className="text-sm text-muted-foreground">Total Posts</div>
@@ -374,7 +379,7 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {achievements.map((achievement) => (
+                {availableAchievements.map((achievement) => (
                   <div
                     key={achievement.id}
                     className={`p-4 rounded-lg border-2 ${getRarityColor(achievement.rarity)} ${

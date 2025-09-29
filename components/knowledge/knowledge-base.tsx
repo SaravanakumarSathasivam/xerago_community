@@ -27,37 +27,8 @@ import {
 } from "lucide-react"
 
 import { getArticles, createArticle as apiCreateArticle, likeArticle, bookmarkArticle } from "@/lib/api"
+import { useDropdownOptions } from "@/hooks/use-dropdown-options"
 const mockArticles: any[] = []
-
-const mockPendingArticles = [
-  {
-    id: "pending-1",
-    title: "Advanced SEO Strategies for 2024",
-    content:
-      "Comprehensive guide covering the latest SEO trends, algorithm updates, and optimization techniques that have proven effective in driving organic traffic growth.",
-    author: {
-      name: "John Smith",
-      department: "Marketing",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=john",
-    },
-    category: "Marketing",
-    type: "Guide",
-    createdAt: "2024-01-15T10:30:00Z",
-    tags: ["SEO", "Marketing", "Strategy", "2024"],
-    difficulty: "Advanced",
-    status: "pending",
-  },
-]
-
-const categories = [
-  { id: "all", name: "All Categories", count: mockArticles.length },
-  { id: "Marketing", name: "Marketing", count: 1 },
-  { id: "Analytics", name: "Analytics", count: 1 },
-  { id: "Technology", name: "Technology", count: 1 },
-  { id: "AI & Innovation", name: "AI & Innovation", count: 1 },
-]
-
-const articleTypes = ["Guide", "Tutorial", "Checklist", "Comparison", "Template", "Case Study"]
 
 interface KnowledgeBaseProps {
   user: any
@@ -68,7 +39,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [sortBy, setSortBy] = useState("recent")
   const [articles, setArticles] = useState<any[]>(mockArticles)
-  const [pendingArticles, setPendingArticles] = useState(mockPendingArticles)
+  const [pendingArticles, setPendingArticles] = useState([])
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("browse")
   const [newArticle, setNewArticle] = useState({
@@ -81,6 +52,12 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
   })
 
   const isAdmin = user.role === "admin"
+
+  // Fetch dropdown options from API
+  const { options: articleCategories, loading: articleCategoriesLoading } = useDropdownOptions('article_category');
+  const { options: articleTypes, loading: articleTypesLoading } = useDropdownOptions('article_type');
+  const { options: difficultyLevels, loading: difficultyLevelsLoading } = useDropdownOptions('article_difficulty');
+  const { options: sortOptions, loading: sortOptionsLoading } = useDropdownOptions('article_sort');
 
   const filteredArticles = articles.filter((article) => {
     const matchesCategory = selectedCategory === "all" || article.category === selectedCategory
@@ -213,6 +190,15 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
     }
   }
 
+  const categories = [
+    { id: "all", name: "All Categories", count: articles.length },
+    ...articleCategories.map((cat) => ({
+      id: cat.value,
+      name: cat.label,
+      count: articles.filter((a) => a.category === cat.value).length,
+    })),
+  ]
+
   const bookmarkedArticles = articles.filter((article) => article.isBookmarked)
   const myArticles = articles.filter((article) => article.author.name === user.name)
 
@@ -278,8 +264,8 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                     </SelectTrigger>
                     <SelectContent>
                       {articleTypes.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type}
+                        <SelectItem key={type._id} value={type.value}>
+                          {type.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -295,9 +281,11 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Beginner">Beginner</SelectItem>
-                      <SelectItem value="Intermediate">Intermediate</SelectItem>
-                      <SelectItem value="Advanced">Advanced</SelectItem>
+                      {difficultyLevels.map((level) => (
+                        <SelectItem key={level._id} value={level.value}>
+                          {level.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -375,9 +363,11 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="recent">Most Recent</SelectItem>
-                <SelectItem value="popular">Most Viewed</SelectItem>
-                <SelectItem value="liked">Most Liked</SelectItem>
+                {sortOptions.map((option) => (
+                  <SelectItem key={option._id} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

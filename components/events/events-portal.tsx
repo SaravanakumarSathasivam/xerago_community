@@ -50,26 +50,10 @@ import {
   createEvent as apiCreateEvent,
   toggleRsvp,
 } from "@/lib/api";
+import { useDropdownOptions } from "@/hooks/use-dropdown-options";
 
 // start with empty; populate via API
 const mockEvents: any[] = [];
-
-const eventTypes = [
-  "Workshop",
-  "Lunch & Learn",
-  "Presentation",
-  "Team Building",
-  "Conference",
-  "Training",
-];
-const eventCategories = [
-  "AI & Innovation",
-  "Analytics",
-  "Technology",
-  "Marketing",
-  "Social",
-  "Professional Development",
-];
 
 interface EventsPortalProps {
   user: any;
@@ -93,6 +77,11 @@ export function EventsPortal({ user }: EventsPortalProps) {
     maxAttendees: "",
     tags: "",
   });
+
+  // Fetch dropdown options from API
+  const { options: eventTypes, loading: eventTypesLoading } = useDropdownOptions('event_type');
+  const { options: eventCategories, loading: eventCategoriesLoading } = useDropdownOptions('event_category');
+  const { options: sortOptions, loading: sortOptionsLoading } = useDropdownOptions('event_sort');
 
   useEffect(() => {
     (async () => {
@@ -226,9 +215,9 @@ export function EventsPortal({ user }: EventsPortalProps) {
   const categories = [
     { id: "all", name: "All Categories", count: events.length },
     ...eventCategories.map((cat) => ({
-      id: cat,
-      name: cat,
-      count: events.filter((e) => e.category === cat).length,
+      id: cat.value,
+      name: cat.label,
+      count: events.filter((e) => e.category === cat.value).length,
     })),
   ];
 
@@ -305,8 +294,8 @@ export function EventsPortal({ user }: EventsPortalProps) {
                       </SelectTrigger>
                       <SelectContent>
                         {eventTypes.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {type}
+                          <SelectItem key={type._id} value={type.value}>
+                            {type.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -325,8 +314,8 @@ export function EventsPortal({ user }: EventsPortalProps) {
                       </SelectTrigger>
                       <SelectContent>
                         {eventCategories.map((category) => (
-                          <SelectItem key={category} value={category}>
-                            {category}
+                          <SelectItem key={category._id} value={category.value}>
+                            {category.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -464,8 +453,11 @@ export function EventsPortal({ user }: EventsPortalProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="date">By Date</SelectItem>
-                <SelectItem value="popular">Most Popular</SelectItem>
+                {sortOptions.map((option) => (
+                  <SelectItem key={option._id} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

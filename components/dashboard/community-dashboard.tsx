@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -26,6 +26,7 @@ import { Leaderboard } from "@/components/gamification/leaderboard"
 import { AdminDashboard } from "@/components/admin/admin-dashboard"
 import { EventsPortal } from "@/components/events/events-portal"
 import { WelcomePopup } from "@/components/ui/welcome-popup"
+import { getFeed } from "@/lib/api"
 
 interface CommunityDashboardProps {
   user: any
@@ -39,48 +40,30 @@ export function CommunityDashboard({ user, onLogout }: CommunityDashboardProps) 
 
   const isAdmin = user.role === "admin"
 
-  const feedActivities = [
-    {
-      id: "1",
-      type: "article",
-      title: "New Article: AI in Marketing Automation",
-      author: "Sarah Chen",
-      department: "Marketing",
-      timestamp: "2 hours ago",
-      description: "Shared insights on implementing AI-powered marketing automation",
-      engagement: { likes: 12, comments: 5 },
-    },
-    {
-      id: "2",
-      type: "event",
-      title: "Upcoming Event: Data Analytics Workshop",
-      author: "Mike Rodriguez",
-      department: "Digital Analytics",
-      timestamp: "4 hours ago",
-      description: "Created a new workshop on advanced analytics techniques",
-      engagement: { attendees: 18, interested: 25 },
-    },
-    {
-      id: "3",
-      type: "discussion",
-      title: "Hot Discussion: Best CMS Migration Practices",
-      author: "Emily Johnson",
-      department: "CMS",
-      timestamp: "6 hours ago",
-      description: "Started a discussion about successful migration strategies",
-      engagement: { replies: 8, participants: 12 },
-    },
-    {
-      id: "4",
-      type: "achievement",
-      title: "Achievement Unlocked: Knowledge Contributor",
-      author: "Lisa Wang",
-      department: "AI Engineering",
-      timestamp: "1 day ago",
-      description: "Earned the Knowledge Contributor badge for sharing 5 articles",
-      engagement: { congratulations: 15 },
-    },
-  ]
+  const [feedActivities, setFeedActivities] = useState<any[]>([])
+  const [feedPage, setFeedPage] = useState(1)
+  const [feedHasMore, setFeedHasMore] = useState(true)
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const res = await getFeed(1, 5)
+        setFeedActivities(res.data.items)
+        setFeedPage(1)
+        setFeedHasMore(res.data.page < res.data.totalPages)
+      } catch {}
+    })()
+  }, [])
+
+  const loadMoreFeed = async () => {
+    try {
+      const nextPage = feedPage + 1
+      const res = await getFeed(nextPage, 5)
+      setFeedActivities((prev) => [...prev, ...res.data.items])
+      setFeedPage(nextPage)
+      setFeedHasMore(res.data.page < res.data.totalPages)
+    } catch {}
+  }
 
   const getActivityIcon = (type: string) => {
     switch (type) {
@@ -320,9 +303,9 @@ export function CommunityDashboard({ user, onLogout }: CommunityDashboardProps) 
                               </div>
                               <p className="text-sm text-muted-foreground">{activity.description}</p>
                               <div className="flex items-center space-x-4 text-xs text-muted-foreground">
-                                <span className="font-medium">{activity.author}</span>
+                                <span className="font-medium">{activity.author?.name}</span>
                                 <span>•</span>
-                                <span>{activity.department}</span>
+                                <span>{activity.author?.department}</span>
                                 <span>•</span>
                                 <div className="flex items-center space-x-2">
                                   {activity.engagement.likes && <span>{activity.engagement.likes} likes</span>}
@@ -341,6 +324,11 @@ export function CommunityDashboard({ user, onLogout }: CommunityDashboardProps) 
                         </CardContent>
                       </Card>
                     ))}
+                    {feedHasMore && (
+                      <div className="flex justify-center pt-2">
+                        <Button variant="outline" size="sm" onClick={loadMoreFeed}>Load more</Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </TabsContent>

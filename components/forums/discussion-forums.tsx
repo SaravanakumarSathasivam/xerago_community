@@ -41,51 +41,12 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-// Mock data for forums
-const forumCategories = [
-  {
-    id: "general",
-    name: "General Discussion",
-    description: "Open discussions about work and life",
-    color: "bg-blue-100 text-blue-700",
-  },
-  {
-    id: "tech",
-    name: "Tech Talk",
-    description: "Technology discussions and troubleshooting",
-    color: "bg-green-100 text-green-700",
-  },
-  {
-    id: "marketing",
-    name: "Marketing Insights",
-    description: "Share marketing strategies and campaigns",
-    color: "bg-purple-100 text-purple-700",
-  },
-  {
-    id: "analytics",
-    name: "Data & Analytics",
-    description: "Data insights and analytics discussions",
-    color: "bg-orange-100 text-orange-700",
-  },
-  {
-    id: "ai",
-    name: "AI & Innovation",
-    description: "AI tools and innovative solutions",
-    color: "bg-pink-100 text-pink-700",
-  },
-  {
-    id: "announcements",
-    name: "Announcements",
-    description: "Company updates and important news",
-    color: "bg-red-100 text-red-700",
-  },
-];
-
 import {
   getForumPosts,
   createForumPost as apiCreateForumPost,
   likeForumPost,
 } from "@/lib/api";
+import { useDropdownOptions } from "@/hooks/use-dropdown-options";
 const mockPosts: any[] = [];
 
 interface DiscussionForumsProps {
@@ -111,6 +72,10 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
     category: "",
     tags: [],
   });
+
+  // Fetch dropdown options from API
+  const { options: forumCategories, loading: forumCategoriesLoading } = useDropdownOptions('forum_category');
+  const { options: sortOptions, loading: sortOptionsLoading } = useDropdownOptions('forum_sort');
 
   const filteredPosts = posts.filter((post) => {
     const matchesCategory =
@@ -232,8 +197,8 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                   </SelectTrigger>
                   <SelectContent>
                     {forumCategories.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.name}
+                      <SelectItem key={category._id} value={category.value}>
+                        {category.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -295,16 +260,16 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
         </Button>
         {forumCategories.map((category) => (
           <Button
-            key={category.id}
-            variant={selectedCategory === category.id ? "default" : "outline"}
-            onClick={() => setSelectedCategory(category.id)}
+            key={category._id}
+            variant={selectedCategory === category.value ? "default" : "outline"}
+            onClick={() => setSelectedCategory(category.value)}
             className="h-auto p-3 flex flex-col items-center gap-1"
           >
             <div
-              className={`w-3 h-3 rounded-full ${category.color.split(" ")[0]}`}
+              className={`w-3 h-3 rounded-full ${category.metadata?.color || 'bg-gray-200'}`}
             />
             <span className="text-xs text-center leading-tight">
-              {category.name}
+              {category.label}
             </span>
           </Button>
         ))}
@@ -327,24 +292,16 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="recent">
-              <div className="flex items-center">
-                <Clock className="w-4 h-4 mr-2" />
-                Most Recent
-              </div>
-            </SelectItem>
-            <SelectItem value="popular">
-              <div className="flex items-center">
-                <ThumbsUp className="w-4 h-4 mr-2" />
-                Most Liked
-              </div>
-            </SelectItem>
-            <SelectItem value="discussed">
-              <div className="flex items-center">
-                <TrendingUp className="w-4 h-4 mr-2" />
-                Most Discussed
-              </div>
-            </SelectItem>
+            {sortOptions.map((option) => (
+              <SelectItem key={option._id} value={option.value}>
+                <div className="flex items-center">
+                  {option.value === 'recent' && <Clock className="w-4 h-4 mr-2" />}
+                  {option.value === 'popular' && <ThumbsUp className="w-4 h-4 mr-2" />}
+                  {option.value === 'discussed' && <TrendingUp className="w-4 h-4 mr-2" />}
+                  {option.label}
+                </div>
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -370,7 +327,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
         ) : (
           sortedPosts.map((post) => {
             const category = forumCategories.find(
-              (cat) => cat.id === post.category
+              (cat) => cat.value === post.category
             );
             return (
               <Card key={post.id} className="hover:shadow-md transition-shadow">
@@ -402,7 +359,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                       </div>
                     </div>
                     {category && (
-                      <Badge className={category.color}>{category.name}</Badge>
+                      <Badge className={category.metadata?.color || 'bg-gray-100 text-gray-700'}>{category.label}</Badge>
                     )}
                   </div>
                 </CardHeader>

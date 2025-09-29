@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import axios from "axios"
-import { API_BASE_URL } from "@/lib/api"
+import { getAdminStats, getAdminUsers, updateAdminUserRole, updateAdminUserStatus, getAdminReports, getAdminAnalytics } from "@/lib/api"
+import { useDropdownOptions } from "@/hooks/use-dropdown-options"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -99,12 +99,35 @@ interface AdminDashboardProps {
   currentUser: any
 }
 
+interface AnalyticsRes {
+  topCategories: any[]
+  dailyActiveUsers: any[]
+}
+
+interface AdminStats {
+  totalUsers: number
+  activeUsers: number
+  totalPosts: number
+  totalArticles: number
+  pendingReports: number
+  newUsersThisWeek: number
+  engagementRate: number
+  averageSessionTime: string
+}
+
 export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState("overview")
   const [users, setUsers] = useState<any[]>(mockUsers)
   const [reports, setReports] = useState(mockReports)
   const [selectedUser, setSelectedUser] = useState<any>(null)
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false)
+  const [analyticsRes, setAnalyticsRes] = useState<AnalyticsRes | undefined>()
+  const [adminStats, setAdminStats] = useState<AdminStats | undefined>()
+
+  // Fetch dropdown options from API
+  const { options: userStatusOptions, loading: userStatusLoading } = useDropdownOptions('admin_user_status');
+  const { options: reportPriorityOptions, loading: reportPriorityLoading } = useDropdownOptions('report_priority');
+  const { options: reportTypeOptions, loading: reportTypeLoading } = useDropdownOptions('report_type');
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString)
@@ -134,24 +157,52 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   useEffect(() => {
     ;(async () => {
       try {
-        const [leaderboardRes] = await Promise.all([
-          axios.get(`${API_BASE_URL}/api/leaderboard`),
-        ])
-        const lb = leaderboardRes.data?.data?.leaderboard || []
-        setUsers(lb.map((u: any) => ({
-          id: u.id,
+        const statsRes = await getAdminStats()
+        console.log(statsRes.data.stats, 'statsRes')
+        setAdminStats(statsRes.data.stats.map((s: any) => ({
+          totalUsers: s.totalUsers || 0,
+          activeUsers: s.activeUsers,
+          totalPosts: s.totalPosts,
+          totalArticles: s.totalArticles,
+          pendingReports: s.pendingReports,
+          newUsersThisWeek: s.newUsersThisWeek,
+          engagementRate: s.engagementRate,
+          averageSessionTime: s.averageSessionTime,
+        })))
+        // You can render statsRes.data.stats directly where needed
+
+        const usersRes = await getAdminUsers({ page: 1, limit: 20 })
+        setUsers(usersRes.data.users.map((u: any) => ({
+          id: u._id,
           name: u.name,
-          email: "",
+          email: u.email,
           department: u.department,
           avatar: u.avatar,
-          joinedAt: new Date().toISOString(),
-          lastActive: new Date().toISOString(),
-          status: "active",
-          points: u.points,
+          joinedAt: u.createdAt,
+          lastActive: u.updatedAt,
+          status: u.isActive ? 'active' : 'suspended',
+          points: u.gamification?.points || 0,
           postsCount: 0,
           articlesCount: 0,
-          role: "member",
+          role: u.role || 'member',
         })))
+
+        const reportsRes = await getAdminReports({ status: 'pending', page: 1, limit: 10 })
+        setReports(reportsRes.data.reports.map((r: any) => ({
+          id: r._id,
+          type: r.type,
+          reportedBy: r.reportedBy?.name || 'Unknown',
+          targetUser: r.targetUser?.name || '-',
+          targetContent: r.targetContent?.model || '-',
+          reason: r.reason,
+          status: r.status,
+          createdAt: r.createdAt,
+          priority: r.priority,
+        })))
+
+        const analyticsRes = await getAdminAnalytics()
+        setAnalyticsRes(analyticsRes.data)
+        // analyticsRes.data.topCategories and .dailyActiveUsers can replace mockAnalytics
       } catch {}
     })()
   }, [])
@@ -162,28 +213,20 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         report.id === reportId ? { ...report, status: action === "approve" ? "resolved" : "dismissed" } : report,
       ),
     )
+    // Optionally call backend to persist status update when an endpoint is added
   }
 
-  const handleUserAction = (userId: string, action: "suspend" | "activate" | "promote" | "demote") => {
-    setUsers(
-      users.map((user) => {
-        if (user.id === userId) {
-          switch (action) {
-            case "suspend":
-              return { ...user, status: "suspended" }
-            case "activate":
-              return { ...user, status: "active" }
-            case "promote":
-              return { ...user, role: user.role === "member" ? "moderator" : "admin" }
-            case "demote":
-              return { ...user, role: user.role === "admin" ? "moderator" : "member" }
-            default:
-              return user
-          }
-        }
-        return user
-      }),
-    )
+  const handleUserAction = async (userId: string, action: "suspend" | "activate" | "promote" | "demote") => {
+    try {
+      if (action === 'suspend' || action === 'activate') {
+        await updateAdminUserStatus(userId, action === 'activate')
+        setUsers(users.map((u) => u.id === userId ? { ...u, status: action === 'activate' ? 'active' : 'suspended' } : u))
+      } else if (action === 'promote' || action === 'demote') {
+        const nextRole = action === 'promote' ? (users.find(u => u.id === userId)?.role === 'member' ? 'moderator' : 'admin') : (users.find(u => u.id === userId)?.role === 'admin' ? 'moderator' : 'member')
+        await updateAdminUserRole(userId, nextRole!)
+        setUsers(users.map((u) => u.id === userId ? { ...u, role: nextRole } : u))
+      }
+    } catch {}
   }
 
   return (
@@ -217,8 +260,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{adminStats.totalUsers}</div>
-                <p className="text-xs text-muted-foreground">+{adminStats.newUsersThisWeek} this week</p>
+                <div className="text-2xl font-bold">{adminStats?.totalUsers}</div>
+                <p className="text-xs text-muted-foreground">+{adminStats?.newUsersThisWeek} this week</p>
               </CardContent>
             </Card>
 
@@ -228,10 +271,10 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <UserCheck className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{adminStats.activeUsers}</div>
+                <div className="text-2xl font-bold">{adminStats?.activeUsers}</div>
                 <p className="text-xs text-muted-foreground">
-                  {Math.round((adminStats.activeUsers / adminStats.totalUsers) * 100)}% of total
-                </p>
+                  {Math.round((adminStats?.activeUsers || 0 / adminStats?.totalUsers || 0) * 100)}% of total
+                </p>  
               </CardContent>
             </Card>
 
@@ -241,8 +284,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <MessageSquare className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{adminStats.totalPosts}</div>
-                <p className="text-xs text-muted-foreground">{adminStats.totalArticles} knowledge articles</p>
+                <div className="text-2xl font-bold">{adminStats?.totalPosts}</div>
+                <p className="text-xs text-muted-foreground">{adminStats?.totalArticles} knowledge articles</p>
               </CardContent>
             </Card>
 
@@ -252,7 +295,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <AlertTriangle className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-red-600">{adminStats.pendingReports}</div>
+                <div className="text-2xl font-bold text-red-600">{adminStats?.pendingReports}</div>
                 <p className="text-xs text-muted-foreground">Requires attention</p>
               </CardContent>
             </Card>
@@ -273,7 +316,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         <AvatarFallback className="text-xs">
                           {user.name
                             .split(" ")
-                            .map((n) => n[0])
+                            .map((n: any[]) => n[0])
                             .join("")}
                         </AvatarFallback>
                       </Avatar>
@@ -296,7 +339,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {mockAnalytics.topCategories.map((category, index) => (
+                  {analyticsRes?.topCategories.map((category, index) => (
                     <div key={index} className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium">{category.name}</p>
@@ -323,10 +366,11 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Users</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="suspended">Suspended</SelectItem>
-                  <SelectItem value="moderators">Moderators</SelectItem>
+                  {userStatusOptions.map((option) => (
+                    <SelectItem key={option._id} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -346,7 +390,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         <AvatarFallback>
                           {user.name
                             .split(" ")
-                            .map((n) => n[0])
+                            .map((n: any[]) => n[0])
                             .join("")}
                         </AvatarFallback>
                       </Avatar>
@@ -419,7 +463,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{adminStats.totalPosts}</div>
+                <div className="text-2xl font-bold">{adminStats?.totalPosts}</div>
                 <p className="text-sm text-muted-foreground">Total discussions</p>
                 <div className="mt-4 space-y-2">
                   <Button variant="outline" size="sm" className="w-full bg-transparent">
@@ -440,7 +484,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{adminStats.totalArticles}</div>
+                <div className="text-2xl font-bold">{adminStats?.totalArticles}</div>
                 <p className="text-sm text-muted-foreground">Published articles</p>
                 <div className="mt-4 space-y-2">
                   <Button variant="outline" size="sm" className="w-full bg-transparent">
@@ -540,7 +584,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <CardTitle className="text-sm font-medium">Engagement Rate</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{adminStats.engagementRate}%</div>
+                <div className="text-2xl font-bold">{adminStats?.engagementRate}%</div>
                 <p className="text-xs text-muted-foreground">+5% from last month</p>
               </CardContent>
             </Card>
@@ -550,7 +594,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <CardTitle className="text-sm font-medium">Avg Session Time</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{adminStats.averageSessionTime}</div>
+                <div className="text-2xl font-bold">{adminStats?.averageSessionTime}</div>
                 <p className="text-xs text-muted-foreground">+3m from last week</p>
               </CardContent>
             </Card>
@@ -560,7 +604,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <CardTitle className="text-sm font-medium">Daily Active Users</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{adminStats.activeUsers}</div>
+                <div className="text-2xl font-bold">{adminStats?.activeUsers}</div>
                 <p className="text-xs text-muted-foreground">Peak: 94 users</p>
               </CardContent>
             </Card>
