@@ -1,11 +1,11 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Bell,
   Search,
@@ -18,86 +18,97 @@ import {
   LogOut,
   Settings,
   Calendar,
-} from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { DiscussionForums } from "@/components/forums/discussion-forums"
-import { KnowledgeBase } from "@/components/knowledge/knowledge-base"
-import { Leaderboard } from "@/components/gamification/leaderboard"
-import { AdminDashboard } from "@/components/admin/admin-dashboard"
-import { EventsPortal } from "@/components/events/events-portal"
-import { WelcomePopup } from "@/components/ui/welcome-popup"
-import { getFeed } from "@/lib/api"
+} from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { DiscussionForums } from "@/components/forums/discussion-forums";
+import { KnowledgeBase } from "@/components/knowledge/knowledge-base";
+import { Leaderboard } from "@/components/gamification/leaderboard";
+import { AdminDashboard } from "@/components/admin/admin-dashboard";
+import { EventsPortal } from "@/components/events/events-portal";
+import { WelcomePopup } from "@/components/ui/welcome-popup";
+import { getFeed } from "@/lib/api";
+import { formatTimestamp } from "@/helper/helper";
 
 interface CommunityDashboardProps {
-  user: any
-  onLogout: () => void
+  user: any;
+  onLogout: () => void;
 }
 
-export function CommunityDashboard({ user, onLogout }: CommunityDashboardProps) {
-  const [activeTab, setActiveTab] = useState("feed")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [showWelcomePopup, setShowWelcomePopup] = useState(true)
+export function CommunityDashboard({
+  user,
+  onLogout,
+}: CommunityDashboardProps) {
+  const [activeTab, setActiveTab] = useState("feed");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showWelcomePopup, setShowWelcomePopup] = useState(true);
 
-  const isAdmin = user.role === "admin"
+  const isAdmin = user.role === "admin";
 
-  const [feedActivities, setFeedActivities] = useState<any[]>([])
-  const [feedPage, setFeedPage] = useState(1)
-  const [feedHasMore, setFeedHasMore] = useState(true)
+  const [feedActivities, setFeedActivities] = useState<any[]>([]);
+  const [feedPage, setFeedPage] = useState(1);
+  const [feedHasMore, setFeedHasMore] = useState(true);
 
   useEffect(() => {
-    ;(async () => {
+    (async () => {
       try {
-        const res = await getFeed(1, 5)
-        setFeedActivities(res.data.items)
-        setFeedPage(1)
-        setFeedHasMore(res.data.page < res.data.totalPages)
+        const res = await getFeed(1, 5);
+        setFeedActivities(res.data.items);
+        setFeedPage(1);
+        setFeedHasMore(res.data.page < res.data.totalPages);
       } catch {}
-    })()
-  }, [])
+    })();
+  }, []);
 
   const loadMoreFeed = async () => {
     try {
-      const nextPage = feedPage + 1
-      const res = await getFeed(nextPage, 5)
-      setFeedActivities((prev) => [...prev, ...res.data.items])
-      setFeedPage(nextPage)
-      setFeedHasMore(res.data.page < res.data.totalPages)
+      const nextPage = feedPage + 1;
+      const res = await getFeed(nextPage, 5);
+      setFeedActivities((prev) => [...prev, ...res.data.items]);
+      setFeedPage(nextPage);
+      setFeedHasMore(res.data.page < res.data.totalPages);
     } catch {}
-  }
+  };
 
   const getActivityIcon = (type: string) => {
     switch (type) {
       case "article":
-        return <BookOpen className="w-4 h-4" />
+        return <BookOpen className="w-4 h-4" />;
       case "event":
-        return <Calendar className="w-4 h-4" />
+        return <Calendar className="w-4 h-4" />;
       case "discussion":
-        return <MessageSquare className="w-4 h-4" />
+        return <MessageSquare className="w-4 h-4" />;
       case "achievement":
-        return <Trophy className="w-4 h-4" />
+        return <Trophy className="w-4 h-4" />;
       default:
-        return <TrendingUp className="w-4 h-4" />
+        return <TrendingUp className="w-4 h-4" />;
     }
-  }
+  };
 
   const getActivityColor = (type: string) => {
     switch (type) {
       case "article":
-        return "bg-emerald-100 text-emerald-700"
+        return "bg-emerald-100 text-emerald-700";
       case "event":
-        return "bg-green-100 text-green-700"
+        return "bg-green-100 text-green-700";
       case "discussion":
-        return "bg-teal-100 text-teal-700"
+        return "bg-teal-100 text-teal-700";
       case "achievement":
-        return "bg-yellow-100 text-yellow-700"
+        return "bg-yellow-100 text-yellow-700";
       default:
-        return "bg-gray-100 text-gray-700"
+        return "bg-gray-100 text-gray-700";
     }
-  }
+  };
+
+  console.log(feedActivities, "feedActivities");
 
   return (
     <div className="min-h-screen bg-background">
-      {showWelcomePopup && <WelcomePopup userName={user.name} onClose={() => setShowWelcomePopup(false)} />}
+      {showWelcomePopup && (
+        <WelcomePopup
+          userName={user.name}
+          onClose={() => setShowWelcomePopup(false)}
+        />
+      )}
 
       {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
@@ -106,13 +117,17 @@ export function CommunityDashboard({ user, onLogout }: CommunityDashboardProps) 
             <div className="flex items-center space-x-4">
               <div
                 className="w-10 h-10 rounded-lg flex items-center justify-center shadow-md border border-emerald-500/20"
-                style={{ background: "linear-gradient(to right, #249e5e, #16a34a)" }}
+                style={{
+                  background: "linear-gradient(to right, #249e5e, #16a34a)",
+                }}
               >
                 <span className="text-lg font-bold text-gray-900">XM</span>
               </div>
               <div>
                 <h1 className="text-xl font-bold">Xerago Martech Minds</h1>
-                <p className="text-sm text-muted-foreground">Internal Community Portal</p>
+                <p className="text-sm text-muted-foreground">
+                  Internal Community Portal
+                </p>
               </div>
             </div>
 
@@ -142,7 +157,9 @@ export function CommunityDashboard({ user, onLogout }: CommunityDashboardProps) 
                 </Avatar>
                 <div className="hidden md:block">
                   <p className="text-sm font-medium">{user.name}</p>
-                  <p className="text-xs text-muted-foreground">{user.department}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {user.department}
+                  </p>
                 </div>
                 <Button variant="ghost" size="icon" onClick={onLogout}>
                   <LogOut className="w-4 h-4" />
@@ -172,7 +189,9 @@ export function CommunityDashboard({ user, onLogout }: CommunityDashboardProps) 
                   </Avatar>
                   <div>
                     <h3 className="font-semibold">{user.name}</h3>
-                    <p className="text-sm text-muted-foreground">{user.department}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {user.department}
+                    </p>
                   </div>
                 </div>
               </CardHeader>
@@ -194,7 +213,11 @@ export function CommunityDashboard({ user, onLogout }: CommunityDashboardProps) 
                   <span className="text-sm">Badges</span>
                   <div className="flex flex-wrap gap-1">
                     {user.badges.map((badge: string, index: number) => (
-                      <Badge key={index} variant="secondary" className="text-xs">
+                      <Badge
+                        key={index}
+                        variant="secondary"
+                        className="text-xs"
+                      >
                         {badge}
                       </Badge>
                     ))}
@@ -251,8 +274,16 @@ export function CommunityDashboard({ user, onLogout }: CommunityDashboardProps) 
 
           {/* Main Content Area */}
           <div className="lg:col-span-3">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-              <TabsList className={`grid w-full ${isAdmin ? "grid-cols-6" : "grid-cols-5"}`}>
+            <Tabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className="space-y-6"
+            >
+              <TabsList
+                className={`grid w-full ${
+                  isAdmin ? "grid-cols-6" : "grid-cols-5"
+                }`}
+              >
                 <TabsTrigger value="feed" className="flex items-center gap-2">
                   <TrendingUp className="w-4 h-4" />
                   <span className="hidden sm:inline">Feed</span>
@@ -261,7 +292,10 @@ export function CommunityDashboard({ user, onLogout }: CommunityDashboardProps) 
                   <MessageSquare className="w-4 h-4" />
                   <span className="hidden sm:inline">Forums</span>
                 </TabsTrigger>
-                <TabsTrigger value="knowledge" className="flex items-center gap-2">
+                <TabsTrigger
+                  value="knowledge"
+                  className="flex items-center gap-2"
+                >
                   <BookOpen className="w-4 h-4" />
                   <span className="hidden sm:inline">Knowledge</span>
                 </TabsTrigger>
@@ -269,12 +303,18 @@ export function CommunityDashboard({ user, onLogout }: CommunityDashboardProps) 
                   <Calendar className="w-4 h-4" />
                   <span className="hidden sm:inline">Events</span>
                 </TabsTrigger>
-                <TabsTrigger value="leaderboard" className="flex items-center gap-2">
+                <TabsTrigger
+                  value="leaderboard"
+                  className="flex items-center gap-2"
+                >
                   <Trophy className="w-4 h-4" />
                   <span className="hidden sm:inline">Leaderboard</span>
                 </TabsTrigger>
                 {isAdmin && (
-                  <TabsTrigger value="admin" className="flex items-center gap-2">
+                  <TabsTrigger
+                    value="admin"
+                    className="flex items-center gap-2"
+                  >
                     <Settings className="w-4 h-4" />
                     <span className="hidden sm:inline">Admin</span>
                   </TabsTrigger>
@@ -290,33 +330,65 @@ export function CommunityDashboard({ user, onLogout }: CommunityDashboardProps) 
 
                   <div className="space-y-4">
                     {feedActivities.map((activity) => (
-                      <Card key={activity.id} className="hover:shadow-md transition-shadow">
+                      <Card
+                        key={activity.id}
+                        className="hover:shadow-md transition-shadow"
+                      >
                         <CardContent className="p-4">
                           <div className="flex items-start space-x-3">
-                            <div className={`p-2 rounded-full ${getActivityColor(activity.type)}`}>
+                            <div
+                              className={`p-2 rounded-full ${getActivityColor(
+                                activity.type
+                              )}`}
+                            >
                               {getActivityIcon(activity.type)}
                             </div>
                             <div className="flex-1 space-y-2">
                               <div className="flex items-center justify-between">
-                                <h4 className="font-medium text-sm">{activity.title}</h4>
-                                <span className="text-xs text-muted-foreground">{activity.timestamp}</span>
+                                <h4 className="font-medium text-sm">
+                                  {activity.title}
+                                </h4>
+                                <span className="text-xs text-muted-foreground">
+                                  {formatTimestamp(activity.timestamp)}
+                                </span>
                               </div>
-                              <p className="text-sm text-muted-foreground">{activity.description}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {activity.description}
+                              </p>
                               <div className="flex items-center space-x-4 text-xs text-muted-foreground">
-                                <span className="font-medium">{activity.author?.name}</span>
+                                <span className="font-medium">
+                                  {activity.author?.name}
+                                </span>
                                 <span>•</span>
                                 <span>{activity.author?.department}</span>
                                 <span>•</span>
-                                <div className="flex items-center space-x-2">
-                                  {activity.engagement.likes && <span>{activity.engagement.likes} likes</span>}
-                                  {activity.engagement.comments && <span>{activity.engagement.comments} comments</span>}
+                                <div className="flex items-center space-x-3">
+                                  {activity.engagement?.likes !== undefined && (
+                                    <span>
+                                      {activity.engagement.likes}{" "}
+                                      {activity.engagement.likes === 1
+                                        ? "like"
+                                        : "likes"}
+                                    </span>
+                                  )}{" "}
+                                  {activity.engagement.comments !==
+                                    undefined && (
+                                    <span>
+                                      {activity.engagement.comments ?? 0}{" "}
+                                      {activity.engagement.comments === 1
+                                        ? "comment"
+                                        : "comments"}
+                                    </span>
+                                  )}
                                   {activity.engagement.attendees && (
-                                    <span>{activity.engagement.attendees} attendees</span>
+                                    <span>
+                                      {activity.engagement.attendees} attendees
+                                    </span>
                                   )}
-                                  {activity.engagement.replies && <span>{activity.engagement.replies} replies</span>}
-                                  {activity.engagement.congratulations && (
+                                  {/* {activity.engagement.replies && <span>{activity.engagement.replies} replies</span>} */}
+                                  {/* {activity.engagement.congratulations && (
                                     <span>{activity.engagement.congratulations} congratulations</span>
-                                  )}
+                                  )} */}
                                 </div>
                               </div>
                             </div>
@@ -326,7 +398,13 @@ export function CommunityDashboard({ user, onLogout }: CommunityDashboardProps) 
                     ))}
                     {feedHasMore && (
                       <div className="flex justify-center pt-2">
-                        <Button variant="outline" size="sm" onClick={loadMoreFeed}>Load more</Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={loadMoreFeed}
+                        >
+                          Load more
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -359,5 +437,5 @@ export function CommunityDashboard({ user, onLogout }: CommunityDashboardProps) 
         </div>
       </div>
     </div>
-  )
+  );
 }
