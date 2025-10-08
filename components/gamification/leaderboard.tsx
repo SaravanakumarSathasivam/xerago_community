@@ -11,6 +11,22 @@ import { Trophy, Medal, Award, Star, TrendingUp, Users, Calendar, Crown } from "
 import { getLeaderboard, getLeaderboardSummary, getAchievements } from "@/lib/api"
 // const mockUsers: any[] = []
 
+interface User {
+  "id": string,
+  "name": any,
+  "department": string,
+  "avatar": string,
+  "points": number,
+  "level": number,
+  "badges": string[],
+  "weeklyPoints": number,
+  "monthlyPoints": number,
+  "postsCount": number,
+  "helpfulAnswers": number,
+  "streak": number,
+  "rank": number
+}
+
 const achievements = [
   {
     id: "first-post",
@@ -219,7 +235,7 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
             <CardContent>
               <div className="space-y-4">
                 {weekly.leaderboard
-                  .map((user, index) => (
+                  .map((user: User, index: number) => (
                     <div
                       key={user.id}
                       className={`flex items-center justify-between p-4 rounded-lg border ${
@@ -271,7 +287,7 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
             <CardContent>
               <div className="space-y-4">
                 {monthly.leaderboard
-                  .map((user, index) => (
+                  .map((user: User, index: number) => (
                     <div
                       key={user.id}
                       className={`flex items-center justify-between p-4 rounded-lg border ${

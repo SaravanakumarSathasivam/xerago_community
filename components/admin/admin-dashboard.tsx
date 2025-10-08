@@ -158,17 +158,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     ;(async () => {
       try {
         const statsRes = await getAdminStats()
-        console.log(statsRes.data.stats, 'statsRes')
-        setAdminStats(statsRes.data.stats.map((s: any) => ({
-          totalUsers: s.totalUsers || 0,
-          activeUsers: s.activeUsers,
-          totalPosts: s.totalPosts,
-          totalArticles: s.totalArticles,
-          pendingReports: s.pendingReports,
-          newUsersThisWeek: s.newUsersThisWeek,
-          engagementRate: s.engagementRate,
-          averageSessionTime: s.averageSessionTime,
-        })))
+        setAdminStats(statsRes.data.stats)
         // You can render statsRes.data.stats directly where needed
 
         const usersRes = await getAdminUsers({ page: 1, limit: 20 })
@@ -221,6 +211,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       if (action === 'suspend' || action === 'activate') {
         await updateAdminUserStatus(userId, action === 'activate')
         setUsers(users.map((u) => u.id === userId ? { ...u, status: action === 'activate' ? 'active' : 'suspended' } : u))
+        setSelectedUser(users.find(u => u.id === userId ? { ...u, status: action === 'activate' ? 'active' : 'suspended' } : u))
       } else if (action === 'promote' || action === 'demote') {
         const nextRole = action === 'promote' ? (users.find(u => u.id === userId)?.role === 'member' ? 'moderator' : 'admin') : (users.find(u => u.id === userId)?.role === 'admin' ? 'moderator' : 'member')
         await updateAdminUserRole(userId, nextRole!)
@@ -273,7 +264,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               <CardContent>
                 <div className="text-2xl font-bold">{adminStats?.activeUsers}</div>
                 <p className="text-xs text-muted-foreground">
-                  {Math.round((adminStats?.activeUsers || 0 / adminStats?.totalUsers || 0) * 100)}% of total
+                  {Math.round((adminStats?.activeUsers || 0) / (adminStats?.totalUsers || 0) * 100)}% of total
                 </p>  
               </CardContent>
             </Card>
