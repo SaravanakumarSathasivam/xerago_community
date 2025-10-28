@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { Trophy, Medal, Award, Star, TrendingUp, Users, Calendar, Crown } from "lucide-react"
 
-import { getLeaderboard, getLeaderboardSummary, getAchievements } from "@/lib/api"
+import { getLeaderboard, getLeaderboardSummary, getAchievements, getCommunityStats, getMyLeaderboardSummary } from "@/lib/api"
 // const mockUsers: any[] = []
 
 interface User {
@@ -82,20 +82,26 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
   const [weekly, setWeekly] = useState<any>({ leaderboard: [], metrics: {} })
   const [monthly, setMonthly] = useState<any>({ leaderboard: [], metrics: {} })
   const [availableAchievements, setAvailableAchievements] = useState<any[]>([])
+  const [communityStats, setCommunityStats] = useState<{ activeMembers: number; totalPosts: number; totalArticles: number; helpfulAnswers: number } | undefined>()
+  const [mySummary, setMySummary] = useState<{ points: number; level: number; progressPercent: number; pointsToNext: number; earnedAchievements: any[] } | undefined>()
 
   useEffect(() => {
     ;(async () => {
       try {
         const res = await getLeaderboard()
         setUsers(res.data?.leaderboard || [])
-        const [w, m, a] = await Promise.all([
+        const [w, m, a, cs, me] = await Promise.all([
           getLeaderboardSummary('weekly'),
           getLeaderboardSummary('monthly'),
           getAchievements(),
+          getCommunityStats(),
+          getMyLeaderboardSummary(),
         ])
         setWeekly(w.data)
         setMonthly(m.data)
         setAvailableAchievements(a.data.achievements || [])
+        setCommunityStats(cs.data)
+        setMySummary(me.data)
       } catch {}
     })()
   }, [])
@@ -343,19 +349,19 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Level Progress</span>
-                    <span>Level {currentUser.level}</span>
+                    <span>Level {mySummary?.level ?? currentUser.level}</span>
                   </div>
-                  <Progress value={75} className="h-2" />
-                  <p className="text-xs text-muted-foreground">125 points to next level</p>
+                  <Progress value={mySummary?.progressPercent ?? 0} className="h-2" />
+                  <p className="text-xs text-muted-foreground">{mySummary?.pointsToNext ?? 0} points to next level</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 pt-4">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">{currentUser.points}</div>
+                    <div className="text-2xl font-bold text-blue-600">{mySummary?.points ?? currentUser.points}</div>
                     <div className="text-sm text-muted-foreground">Total Points</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">{currentUser.badges.length}</div>
+                    <div className="text-2xl font-bold text-green-600">{mySummary?.earnedAchievements?.length ?? currentUser.badges.length}</div>
                     <div className="text-sm text-muted-foreground">Badges Earned</div>
                   </div>
                 </div>
@@ -371,17 +377,20 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  {/* Placeholder counts could be wired to new summary if needed */}
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-orange-600">1,247</div>
+                    <div className="text-2xl font-bold text-purple-600">{communityStats?.activeMembers ?? 0}</div>
+                    <div className="text-sm text-muted-foreground">Active Members</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-orange-600">{communityStats?.totalPosts ?? 0}</div>
                     <div className="text-sm text-muted-foreground">Total Posts</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-red-600">89</div>
+                    <div className="text-2xl font-bold text-red-600">{communityStats?.totalArticles ?? 0}</div>
                     <div className="text-sm text-muted-foreground">Knowledge Articles</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-teal-600">2,456</div>
+                    <div className="text-2xl font-bold text-teal-600">{communityStats?.helpfulAnswers ?? 0}</div>
                     <div className="text-sm text-muted-foreground">Helpful Answers</div>
                   </div>
                 </div>
@@ -399,9 +408,7 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
                   <div
                     key={achievement.id}
                     className={`p-4 rounded-lg border-2 ${getRarityColor(achievement.rarity)} ${
-                      currentUser.badges.some((badge: string) =>
-                        badge.toLowerCase().includes(achievement.name.toLowerCase()),
-                      )
+                      (mySummary?.earnedAchievements || []).some((ea) => (ea.name || '').toLowerCase() === (achievement.name || '').toLowerCase())
                         ? "opacity-100"
                         : "opacity-60"
                     }`}

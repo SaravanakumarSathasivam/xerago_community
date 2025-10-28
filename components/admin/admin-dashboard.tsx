@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { getAdminStats, getAdminUsers, updateAdminUserRole, updateAdminUserStatus, getAdminReports, getAdminAnalytics } from "@/lib/api"
+import { getAdminStats, getAdminUsers, updateAdminUserRole, updateAdminUserStatus, getAdminReports, getAdminAnalytics, adminListForumPosts, adminDeleteForumPost, adminListArticles, adminUpdateArticleStatus, adminListAchievements, adminCreateAchievement, adminUpdateAchievement, adminDeleteAchievement, adminUpdateReportStatus, getDropdownOptions, adminCreateDropdownOption, adminUpdateDropdownOption, adminDeleteDropdownOption, getPointSettings, updatePointSettings } from "@/lib/api"
 import { useDropdownOptions } from "@/hooks/use-dropdown-options"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -100,8 +100,28 @@ interface AdminDashboardProps {
 }
 
 interface AnalyticsRes {
-  topCategories: any[]
+  engagementRate: number
+  averageSessionTime: string
   dailyActiveUsers: any[]
+  contentGrowth: number
+  topCategories: any[]
+}
+
+interface User {
+  "id": string,
+  "name": any,
+  "department": string,
+  "avatar": string,
+  "points": number,
+  "level": number,
+  "badges": string[],
+  "weeklyPoints": number,
+  "monthlyPoints": number,
+  "postsCount": number,
+  "helpfulAnswers": number,
+  "streak": number,
+  "rank": number,
+  "isActive": boolean
 }
 
 interface AdminStats {
@@ -117,12 +137,24 @@ interface AdminStats {
 
 export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState("overview")
-  const [users, setUsers] = useState<any[]>(mockUsers)
+  const [users, setUsers] = useState<any[]>([])
   const [reports, setReports] = useState(mockReports)
   const [selectedUser, setSelectedUser] = useState<any>(null)
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false)
   const [analyticsRes, setAnalyticsRes] = useState<AnalyticsRes | undefined>()
   const [adminStats, setAdminStats] = useState<AdminStats | undefined>()
+  const [forumModalOpen, setForumModalOpen] = useState(false)
+  const [forumList, setForumList] = useState<any[]>([])
+  const [articleModalOpen, setArticleModalOpen] = useState(false)
+  const [articleList, setArticleList] = useState<any[]>([])
+  const [achievementsModalOpen, setAchievementsModalOpen] = useState(false)
+  const [achievements, setAchievements] = useState<any[]>([])
+  const [flagModalOpen, setFlagModalOpen] = useState(false)
+  const [flaggedReports, setFlaggedReports] = useState<any[]>([])
+  const [categoriesModalOpen, setCategoriesModalOpen] = useState(false)
+  const [articleCategories, setArticleCategories] = useState<any[]>([])
+  const [pointsModalOpen, setPointsModalOpen] = useState(false)
+  const [pointSettings, setPointSettings] = useState<any | null>(null)
 
   // Fetch dropdown options from API
   const { options: userStatusOptions, loading: userStatusLoading } = useDropdownOptions('admin_user_status');
@@ -457,10 +489,18 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <div className="text-2xl font-bold">{adminStats?.totalPosts}</div>
                 <p className="text-sm text-muted-foreground">Total discussions</p>
                 <div className="mt-4 space-y-2">
-                  <Button variant="outline" size="sm" className="w-full bg-transparent">
+                  <Button variant="outline" size="sm" className="w-full bg-transparent" onClick={async () => {
+                    const res = await adminListForumPosts({ page: 1, limit: 20 })
+                    setForumList(res.data.posts || [])
+                    setForumModalOpen(true)
+                  }}>
                     Moderate Posts
                   </Button>
-                  <Button variant="outline" size="sm" className="w-full bg-transparent">
+                  <Button variant="outline" size="sm" className="w-full bg-transparent" onClick={async () => {
+                    const res = await getAdminReports({ status: 'pending', page: 1, limit: 20 })
+                    setFlaggedReports(res.data.reports || [])
+                    setFlagModalOpen(true)
+                  }}>
                     View Flagged Content
                   </Button>
                 </div>
@@ -478,10 +518,18 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <div className="text-2xl font-bold">{adminStats?.totalArticles}</div>
                 <p className="text-sm text-muted-foreground">Published articles</p>
                 <div className="mt-4 space-y-2">
-                  <Button variant="outline" size="sm" className="w-full bg-transparent">
+                  <Button variant="outline" size="sm" className="w-full bg-transparent" onClick={async () => {
+                    const res = await adminListArticles({ page: 1, limit: 20 })
+                    setArticleList(res.data.articles || [])
+                    setArticleModalOpen(true)
+                  }}>
                     Review Articles
                   </Button>
-                  <Button variant="outline" size="sm" className="w-full bg-transparent">
+                  <Button variant="outline" size="sm" className="w-full bg-transparent" onClick={async () => {
+                    const res = await getDropdownOptions('article_category')
+                    setArticleCategories(res.data)
+                    setCategoriesModalOpen(true)
+                  }}>
                     Manage Categories
                   </Button>
                 </div>
@@ -499,16 +547,190 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <div className="text-2xl font-bold">24</div>
                 <p className="text-sm text-muted-foreground">Active badges</p>
                 <div className="mt-4 space-y-2">
-                  <Button variant="outline" size="sm" className="w-full bg-transparent">
+                  <Button variant="outline" size="sm" className="w-full bg-transparent" onClick={async () => {
+                    const res = await adminListAchievements()
+                    setAchievements(res.data.achievements || [])
+                    setAchievementsModalOpen(true)
+                  }}>
                     Manage Badges
                   </Button>
-                  <Button variant="outline" size="sm" className="w-full bg-transparent">
+                  <Button variant="outline" size="sm" className="w-full bg-transparent" onClick={async () => {
+                    const res = await getPointSettings()
+                    setPointSettings(res.data.points)
+                    setPointsModalOpen(true)
+                  }}>
                     Point System
                   </Button>
                 </div>
               </CardContent>
             </Card>
           </div>
+
+          {/* Forums Moderation Modal */}
+          <Dialog open={forumModalOpen} onOpenChange={setForumModalOpen}>
+            <DialogContent className="max-w-3xl">
+              <DialogHeader>
+                <DialogTitle>Moderate Forum Posts</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+                {forumList.map((p) => (
+                  <div key={p._id} className="p-3 border rounded flex items-center justify-between">
+                    <div>
+                      <div className="font-medium">{p.title}</div>
+                      <div className="text-xs text-muted-foreground">{p.author?.name} • {new Date(p.createdAt).toLocaleString()}</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={async () => { await adminDeleteForumPost(p._id); setForumList(forumList.filter(x => x._id !== p._id)); }}>Delete</Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Articles Review Modal */}
+          <Dialog open={articleModalOpen} onOpenChange={setArticleModalOpen}>
+            <DialogContent className="max-w-3xl">
+              <DialogHeader>
+                <DialogTitle>Review Articles</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+                {articleList.map((a) => (
+                  <div key={a._id} className="p-3 border rounded">
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium">{a.title}</div>
+                      <div className="text-xs text-muted-foreground">{a.author?.name}</div>
+                    </div>
+                    <div className="text-sm text-muted-foreground line-clamp-2">{a.content}</div>
+                    <div className="flex gap-2 mt-2">
+                      <Button variant="outline" size="sm" onClick={async () => { await adminUpdateArticleStatus(a._id, 'published'); }}>Approve</Button>
+                      <Button variant="outline" size="sm" onClick={async () => { await adminUpdateArticleStatus(a._id, 'archived'); }}>Archive</Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Flagged Content (Reports) Modal */}
+          <Dialog open={flagModalOpen} onOpenChange={setFlagModalOpen}>
+            <DialogContent className="max-w-3xl">
+              <DialogHeader>
+                <DialogTitle>Flagged Content</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+                {flaggedReports.map((r) => (
+                  <div key={r._id} className="p-3 border rounded">
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium">{r.type?.replace('_',' ')}</div>
+                      <div className="text-xs text-muted-foreground">{new Date(r.createdAt).toLocaleString()}</div>
+                    </div>
+                    <div className="text-sm text-muted-foreground">{r.reason}</div>
+                    <div className="flex gap-2 mt-2">
+                      <Button variant="outline" size="sm" onClick={async () => { await adminUpdateReportStatus(r._id, 'dismissed'); setFlaggedReports(flaggedReports.filter(x => x._id !== r._id)); }}>Dismiss</Button>
+                      <Button variant="default" size="sm" onClick={async () => { await adminUpdateReportStatus(r._id, 'resolved'); setFlaggedReports(flaggedReports.filter(x => x._id !== r._id)); }}>Resolve</Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Manage Categories Modal */}
+          <Dialog open={categoriesModalOpen} onOpenChange={setCategoriesModalOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Manage Article Categories</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+                {articleCategories.map((c) => (
+                  <div key={c._id} className="p-3 border rounded flex items-center justify-between">
+                    <div>
+                      <div className="font-medium">{c.label}</div>
+                      <div className="text-xs text-muted-foreground">{c.value}</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={async () => {
+                        const nextLabel = prompt('Edit label', c.label)
+                        if (!nextLabel) return
+                        const updated = await adminUpdateDropdownOption(c._id, { label: nextLabel })
+                        setArticleCategories(articleCategories.map(x => x._id === c._id ? updated.data : x))
+                      }}>Edit</Button>
+                      <Button variant="outline" size="sm" onClick={async () => {
+                        await adminDeleteDropdownOption(c._id)
+                        setArticleCategories(articleCategories.filter(x => x._id !== c._id))
+                      }}>Delete</Button>
+                    </div>
+                  </div>
+                ))}
+                <div>
+                  <Button variant="default" size="sm" onClick={async () => {
+                    const label = prompt('New category label')
+                    if (!label) return
+                    const value = label.toLowerCase().replace(/\s+/g,'-')
+                    const created = await adminCreateDropdownOption({ category: 'article_category', value, label })
+                    setArticleCategories([created.data, ...articleCategories])
+                  }}>Add Category</Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Point System Modal */}
+          <Dialog open={pointsModalOpen} onOpenChange={setPointsModalOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Point System Settings</DialogTitle>
+              </DialogHeader>
+              {pointSettings && (
+                <div className="space-y-3">
+                  {Object.entries(pointSettings).map(([k,v]) => (
+                    <div key={k} className="flex items-center justify-between">
+                      <div className="text-sm font-medium">{k}</div>
+                      <Input
+                        className="w-24"
+                        type="number"
+                        value={v as any}
+                        onChange={(e) => setPointSettings({ ...pointSettings, [k]: Number(e.target.value) })}
+                      />
+                    </div>
+                  ))}
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="default" size="sm" onClick={async () => {
+                      await updatePointSettings(pointSettings)
+                      setPointsModalOpen(false)
+                    }}>Save</Button>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
+
+          {/* Achievements Management Modal */}
+          <Dialog open={achievementsModalOpen} onOpenChange={setAchievementsModalOpen}>
+            <DialogContent className="max-w-3xl">
+              <DialogHeader>
+                <DialogTitle>Manage Achievements</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+                {achievements.map((ac) => (
+                  <div key={ac._id} className="p-3 border rounded">
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium">{ac.name}</div>
+                      <div className="text-xs text-muted-foreground">{ac.rarity}</div>
+                    </div>
+                    <div className="flex gap-2 mt-2">
+                      <Button variant="outline" size="sm" onClick={async () => { const updated = await adminUpdateAchievement(ac._id, { name: ac.name }); }}>Edit</Button>
+                      <Button variant="outline" size="sm" onClick={async () => { await adminDeleteAchievement(ac._id); setAchievements(achievements.filter(x => x._id !== ac._id)); }}>Delete</Button>
+                    </div>
+                  </div>
+                ))}
+                <div>
+                  <Button variant="default" size="sm" onClick={async () => { const res = await adminCreateAchievement({ name: 'New Badge', description: 'Custom', category: 'special', type: 'badge', icon: '✨', color: '#999', rarity: 'common', points: 1, criteria: { type: 'custom', value: 1, timeframe: 'all_time' } }); setAchievements([res.data.achievement, ...achievements]) }}>Add Achievement</Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="reports" className="space-y-6">
@@ -575,8 +797,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <CardTitle className="text-sm font-medium">Engagement Rate</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{adminStats?.engagementRate}%</div>
-                <p className="text-xs text-muted-foreground">+5% from last month</p>
+                <div className="text-2xl font-bold">{analyticsRes?.engagementRate ?? 0}%</div>
+                <p className="text-xs text-muted-foreground">Interactions per post</p>
               </CardContent>
             </Card>
 
@@ -585,8 +807,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <CardTitle className="text-sm font-medium">Avg Session Time</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{adminStats?.averageSessionTime}</div>
-                <p className="text-xs text-muted-foreground">+3m from last week</p>
+                <div className="text-2xl font-bold">{analyticsRes?.averageSessionTime ?? '0m'}</div>
+                <p className="text-xs text-muted-foreground">Per user session</p>
               </CardContent>
             </Card>
 
@@ -595,8 +817,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <CardTitle className="text-sm font-medium">Daily Active Users</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{adminStats?.activeUsers}</div>
-                <p className="text-xs text-muted-foreground">Peak: 94 users</p>
+                <div className="text-2xl font-bold">{analyticsRes?.dailyActiveUsers?.[analyticsRes.dailyActiveUsers.length - 1]?.users ?? 0}</div>
+                <p className="text-xs text-muted-foreground">Today's activity</p>
               </CardContent>
             </Card>
 
@@ -605,23 +827,38 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <CardTitle className="text-sm font-medium">Content Growth</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">+23%</div>
-                <p className="text-xs text-muted-foreground">Posts this month</p>
+                <div className="text-2xl font-bold">{analyticsRes?.contentGrowth ?? 0 > 0 ? '+' : ''}{analyticsRes?.contentGrowth ?? 0}%</div>
+                <p className="text-xs text-muted-foreground">Posts this month vs last</p>
               </CardContent>
             </Card>
           </div>
 
           <Card>
             <CardHeader>
-              <CardTitle>Community Health</CardTitle>
+              <CardTitle>Daily Active Users (Last 7 Days)</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="text-center py-8">
-                  <BarChart3 className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Analytics Dashboard</h3>
-                  <p className="text-muted-foreground">Detailed analytics and reporting coming soon</p>
-                </div>
+                {analyticsRes?.dailyActiveUsers && analyticsRes.dailyActiveUsers.length > 0 ? (
+                  <div className="space-y-2">
+                    {analyticsRes.dailyActiveUsers.map((day: any) => (
+                      <div key={day.date} className="flex items-center justify-between">
+                        <div className="text-sm font-medium">{new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+                        <div className="flex items-center gap-2">
+                          <div className="text-sm text-muted-foreground">{day.users} users</div>
+                          <div className="w-48 bg-gray-200 rounded-full h-2">
+                            <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${Math.min((day.users / (Math.max(...analyticsRes.dailyActiveUsers.map((d: any) => d.users)) || 1)) * 100, 100)}%` }}></div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <BarChart3 className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">No activity data available</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

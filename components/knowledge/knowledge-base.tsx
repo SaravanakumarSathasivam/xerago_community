@@ -130,10 +130,10 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
   }
 
   const handleApproveArticle = (articleId: string) => {
-    const article = pendingArticles.find((a) => a.id === articleId)
+    const article = pendingArticles.find((a: any) => a.id === articleId)
     if (article) {
       const publishedArticle = {
-        ...article,
+        ...article as any,
         views: 0,
         likes: 0,
         bookmarks: 0,
@@ -142,12 +142,12 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
         status: "published",
       }
       setArticles([publishedArticle, ...articles])
-      setPendingArticles(pendingArticles.filter((a) => a.id !== articleId))
+      setPendingArticles(pendingArticles.filter((a: any) => a.id !== articleId))
     }
   }
 
   const handleRejectArticle = (articleId: string) => {
-    setPendingArticles(pendingArticles.filter((a) => a.id !== articleId))
+    setPendingArticles(pendingArticles.filter((a: any) => a.id !== articleId))
   }
 
   const formatTimeAgo = (dateString: string) => {
@@ -195,7 +195,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
     ...articleCategories.map((cat) => ({
       id: cat.value,
       name: cat.label,
-      count: articles.filter((a) => a.category === cat.value).length,
+      count: articles.filter((a) => a.category.toLowerCase() === cat.value.toLowerCase()).length,
     })),
   ]
 
@@ -605,7 +605,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
               </Card>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {pendingArticles.map((article) => (
+                {pendingArticles.map((article: any) => (
                   <Card key={article.id} className="hover:shadow-lg transition-shadow border-orange-200">
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">
@@ -623,7 +623,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                       <p className="text-sm text-muted-foreground text-pretty line-clamp-3">{article.content}</p>
 
                       <div className="flex flex-wrap gap-1">
-                        {article.tags.slice(0, 3).map((tag, index) => (
+                        {article.tags.slice(0, 3).map((tag: string, index: number) => (
                           <Badge key={index} variant="secondary" className="text-xs">
                             #{tag}
                           </Badge>
@@ -636,7 +636,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                             <AvatarFallback className="text-xs">
                               {article.author.name
                                 .split(" ")
-                                .map((n) => n[0])
+                                .map((n: any[]) => n[0])
                                 .join("")}
                             </AvatarFallback>
                           </Avatar>

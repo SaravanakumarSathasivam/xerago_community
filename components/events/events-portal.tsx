@@ -94,7 +94,7 @@ export function EventsPortal({ user }: EventsPortalProps) {
     })();
   }, []);
 
-  const isAdmin = user.email === "samuel@xerago.com";
+  const isAdmin = user.role === "admin";
 
   const filteredEvents = events.filter((event) => {
     const matchesCategory =

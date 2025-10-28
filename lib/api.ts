@@ -45,6 +45,12 @@ async function request<T>(
 
     return response.data;
   } catch (error: any) {
+    if (error.response?.status === 440 || /Session expired due to inactivity/i.test(error.response?.data?.message)) {
+      if (typeof window !== 'undefined') {
+        try { localStorage.removeItem('xerago-token'); } catch {}
+        window.location.href = '/app/(auth)/reset-password';
+      }
+    }
     if (error.response) {
       throw new Error(
         error.response.data?.message ||
@@ -303,6 +309,28 @@ export async function seedDropdownOptions(): Promise<{
   return request("/api/dropdowns/seed", { method: "POST" });
 }
 
+// Admin Dropdown CRUD
+export async function adminCreateDropdownOption(payload: { category: string; value: string; label: string; description?: string; order?: number; metadata?: any }): Promise<{ success: boolean; message: string; data: any }> {
+  return request("/api/dropdowns", { method: "POST", data: payload });
+}
+
+export async function adminUpdateDropdownOption(id: string, payload: any): Promise<{ success: boolean; message: string; data: any }> {
+  return request(`/api/dropdowns/${id}`, { method: "PUT", data: payload });
+}
+
+export async function adminDeleteDropdownOption(id: string): Promise<{ success: boolean; message: string }> {
+  return request(`/api/dropdowns/${id}`, { method: "DELETE" });
+}
+
+// Gamification point settings
+export async function getPointSettings(): Promise<{ success: boolean; data: { points: any } }> {
+  return request(`/api/admin/settings/points`, { method: "GET" });
+}
+
+export async function updatePointSettings(points: any): Promise<{ success: boolean; message: string; data: { points: any } }> {
+  return request(`/api/admin/settings/points`, { method: "PUT", data: { points } });
+}
+
 // Leaderboard
 export async function getLeaderboard(): Promise<{
   success: boolean;
@@ -323,6 +351,20 @@ export async function getAchievements(): Promise<{
   data: { achievements: any[] };
 }> {
   return request(`/api/leaderboard/achievements`, { method: "GET" });
+}
+
+export async function getCommunityStats(): Promise<{
+  success: boolean;
+  data: { activeMembers: number; totalPosts: number; totalArticles: number; helpfulAnswers: number };
+}> {
+  return request(`/api/leaderboard/community-stats`, { method: "GET" });
+}
+
+export async function getMyLeaderboardSummary(): Promise<{
+  success: boolean;
+  data: { points: number; level: number; progressPercent: number; pointsToNext: number; earnedAchievements: any[] };
+}> {
+  return request(`/api/leaderboard/my-summary`, { method: "GET" });
 }
 
 // Admin
@@ -352,6 +394,52 @@ export async function getAdminReports(params: { status?: string; page?: number; 
   return request(`/api/admin/reports${qs ? `?${qs}` : ''}`, { method: "GET" });
 }
 
-export async function getAdminAnalytics(): Promise<{ success: boolean; data: { topCategories: any[]; dailyActiveUsers: any[] } }> {
+export async function getAdminAnalytics(): Promise<{ success: boolean; data: { engagementRate: number; averageSessionTime: string; dailyActiveUsers: any[]; contentGrowth: number; topCategories: any[] } }> {
   return request(`/api/admin/analytics`, { method: "GET" });
+}
+
+// Admin Content
+export async function adminListForumPosts(params: { page?: number; limit?: number; search?: string } = {}): Promise<{ success: boolean; data: { posts: any[]; total: number } }> {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([k,v]) => { if (v !== undefined && v !== null) query.set(k, String(v)); });
+  const qs = query.toString();
+  return request(`/api/admin/forums/posts${qs ? `?${qs}` : ''}`, { method: "GET" });
+}
+
+export async function adminDeleteForumPost(id: string): Promise<{ success: boolean; message: string }> {
+  return request(`/api/admin/forums/posts/${id}`, { method: "DELETE" });
+}
+
+export async function adminListArticles(params: { page?: number; limit?: number; status?: string; search?: string } = {}): Promise<{ success: boolean; data: { articles: any[]; total: number } }> {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([k,v]) => { if (v !== undefined && v !== null) query.set(k, String(v)); });
+  const qs = query.toString();
+  return request(`/api/admin/articles${qs ? `?${qs}` : ''}`, { method: "GET" });
+}
+
+export async function adminUpdateArticleStatus(id: string, status: string): Promise<{ success: boolean; message: string; data: { article: any } }> {
+  return request(`/api/admin/articles/${id}/status`, { method: "PUT", data: { status } });
+}
+
+export async function adminUpdateReportStatus(
+  id: string,
+  status: 'pending' | 'resolved' | 'dismissed'
+): Promise<{ success: boolean; message: string; data: { report: any } }> {
+  return request(`/api/admin/reports/${id}/status`, { method: "PUT", data: { status } });
+}
+
+export async function adminListAchievements(): Promise<{ success: boolean; data: { achievements: any[] } }> {
+  return request(`/api/admin/achievements`, { method: "GET" });
+}
+
+export async function adminCreateAchievement(payload: any): Promise<{ success: boolean; data: { achievement: any } }> {
+  return request(`/api/admin/achievements`, { method: "POST", data: payload });
+}
+
+export async function adminUpdateAchievement(id: string, payload: any): Promise<{ success: boolean; data: { achievement: any } }> {
+  return request(`/api/admin/achievements/${id}`, { method: "PUT", data: payload });
+}
+
+export async function adminDeleteAchievement(id: string): Promise<{ success: boolean; message: string }> {
+  return request(`/api/admin/achievements/${id}`, { method: "DELETE" });
 }

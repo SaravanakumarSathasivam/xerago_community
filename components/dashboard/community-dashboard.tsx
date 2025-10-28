@@ -41,6 +41,7 @@ export function CommunityDashboard({
   const [activeTab, setActiveTab] = useState("feed");
   const [searchQuery, setSearchQuery] = useState("");
   const [showWelcomePopup, setShowWelcomePopup] = useState(true);
+  const [lastActivity, setLastActivity] = useState<number>(Date.now());
 
   const isAdmin = user.role === "admin";
 
@@ -58,6 +59,27 @@ export function CommunityDashboard({
       } catch {}
     })();
   }, []);
+
+  // Minimal inactivity auto-logout (frontend)
+  useEffect(() => {
+    const maxIdleMs = 30 * 60 * 1000; // 30 minutes
+    const onAnyActivity = () => setLastActivity(Date.now());
+    const interval = setInterval(() => {
+      if (Date.now() - lastActivity > maxIdleMs) {
+        try { localStorage.removeItem('xerago-token'); } catch {}
+        onLogout();
+      }
+    }, 60 * 1000);
+    window.addEventListener('mousemove', onAnyActivity);
+    window.addEventListener('keydown', onAnyActivity);
+    window.addEventListener('click', onAnyActivity);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('mousemove', onAnyActivity);
+      window.removeEventListener('keydown', onAnyActivity);
+      window.removeEventListener('click', onAnyActivity);
+    };
+  }, [lastActivity, onLogout]);
 
   const loadMoreFeed = async () => {
     try {
@@ -98,8 +120,6 @@ export function CommunityDashboard({
         return "bg-gray-100 text-gray-700";
     }
   };
-
-  console.log(feedActivities, "feedActivities");
 
   return (
     <div className="min-h-screen bg-background">
