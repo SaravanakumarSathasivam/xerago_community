@@ -48,8 +48,12 @@ import {
 import {
   getEvents,
   createEvent as apiCreateEvent,
+  createEventForm,
   toggleRsvp,
+  updateEvent,
+  getEventAttendees,
 } from "@/lib/api";
+import Swal from 'sweetalert2'
 import { useDropdownOptions } from "@/hooks/use-dropdown-options";
 
 // start with empty; populate via API
@@ -77,6 +81,11 @@ export function EventsPortal({ user }: EventsPortalProps) {
     maxAttendees: "",
     tags: "",
   });
+  const [eventFiles, setEventFiles] = useState<File[]>([])
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [attendeesDialogOpen, setAttendeesDialogOpen] = useState(false)
+  const [editingEvent, setEditingEvent] = useState<any | null>(null)
+  const [attendees, setAttendees] = useState<any[]>([])
 
   // Fetch dropdown options from API
   const { options: eventTypes, loading: eventTypesLoading } = useDropdownOptions('event_type');
@@ -141,23 +150,25 @@ export function EventsPortal({ user }: EventsPortalProps) {
     )
       return;
 
-    const payload = {
-      title: newEvent.title,
-      description: newEvent.description,
-      date: newEvent.date,
-      endDate: newEvent.endDate || newEvent.date,
-      location: newEvent.location,
-      type: newEvent.type,
-      category: newEvent.category,
-      maxAttendees: newEvent.maxAttendees,
-      tags: newEvent.tags,
-    };
-
     try {
-      const res = await apiCreateEvent(payload);
+      const form = new FormData()
+      form.append('title', newEvent.title)
+      form.append('description', newEvent.description)
+      form.append('date', newEvent.date)
+      form.append('endDate', newEvent.endDate || newEvent.date)
+      form.append('location', newEvent.location)
+      form.append('type', newEvent.type)
+      form.append('category', newEvent.category)
+      form.append('maxAttendees', newEvent.maxAttendees)
+      form.append('tags', newEvent.tags)
+      eventFiles.forEach((f) => form.append('images', f))
+      const res = await createEventForm(form);
       const created = res.data.event;
       setEvents((prev) => [created, ...prev]);
-    } catch {}
+      Swal.fire({ icon: 'success', title: 'Event created', text: 'Your event was created successfully.' })
+    } catch (e: any) {
+      Swal.fire({ icon: 'error', title: 'Create failed', text: e?.message || 'Please try again.' })
+    }
 
     setNewEvent({
       title: "",
@@ -170,6 +181,7 @@ export function EventsPortal({ user }: EventsPortalProps) {
       maxAttendees: "",
       tags: "",
     });
+    setEventFiles([])
     setIsCreateDialogOpen(false);
   };
 
@@ -229,6 +241,52 @@ export function EventsPortal({ user }: EventsPortalProps) {
     const eventDateTime = new Date(eventDate);
     return eventDateTime > now ? "upcoming" : "completed";
   };
+
+  const canEditEvent = (event: any) => {
+    const now = new Date().getTime()
+    const start = new Date(event.date).getTime()
+    const diff = start - now
+    return diff > 24 * 60 * 60 * 1000
+  }
+
+  const openEditEvent = (event: any) => {
+    setEditingEvent({
+      id: event.id,
+      title: event.title,
+      description: event.description,
+      date: event.date?.slice(0,16),
+      endDate: event.endDate?.slice(0,16),
+      location: event.location,
+      maxAttendees: String(event.maxAttendees || ''),
+    })
+    setEditDialogOpen(true)
+  }
+
+  const saveEditEvent = async () => {
+    if (!editingEvent) return
+    try {
+      const res = await updateEvent(editingEvent.id, {
+        title: editingEvent.title,
+        description: editingEvent.description,
+        date: editingEvent.date,
+        endDate: editingEvent.endDate,
+        location: editingEvent.location,
+        maxAttendees: editingEvent.maxAttendees,
+      })
+      const updated = res.data.event
+      setEvents((prev) => prev.map((e) => e.id === updated.id ? updated : e))
+      setEditDialogOpen(false)
+      setEditingEvent(null)
+    } catch {}
+  }
+
+  const openAttendees = async (event: any) => {
+    try {
+      const res = await getEventAttendees(event.id)
+      setAttendees(res.data.attendees || [])
+      setAttendeesDialogOpen(true)
+    } catch {}
+  }
 
   return (
     <div className="space-y-6">
@@ -389,7 +447,11 @@ export function EventsPortal({ user }: EventsPortalProps) {
                   />
                 </div>
 
-                <div className="flex gap-2 pt-4">
+                <div className="flex gap-2 pt-4 items-end">
+                  <div className="flex-1">
+                    <label className="text-sm font-medium">Attachments</label>
+                    <Input type="file" multiple onChange={(e) => setEventFiles(e.target.files ? Array.from(e.target.files) : [])} />
+                  </div>
                   <Button onClick={handleCreateEvent} className="flex-1">
                     Create Event
                   </Button>
@@ -568,6 +630,11 @@ export function EventsPortal({ user }: EventsPortalProps) {
                     </div>
 
                     <div className="flex items-center space-x-2">
+                      {Array.isArray((event as any).images) && (event as any).images.length > 0 && (
+                        <span className="text-xs text-muted-foreground">
+                          {(event as any).images.length} image{(event as any).images.length > 1 ? 's' : ''}
+                        </span>
+                      )}
                       <Button variant="ghost" size="sm" className="p-1 h-auto">
                         <Share className="w-3 h-3" />
                       </Button>
@@ -729,6 +796,8 @@ export function EventsPortal({ user }: EventsPortalProps) {
                           variant="outline"
                           size="sm"
                           className="flex-1 bg-transparent"
+                          disabled={!canEditEvent(event)}
+                          onClick={() => openEditEvent(event)}
                         >
                           Edit Event
                         </Button>
@@ -736,6 +805,7 @@ export function EventsPortal({ user }: EventsPortalProps) {
                           variant="outline"
                           size="sm"
                           className="flex-1 bg-transparent"
+                          onClick={() => openAttendees(event)}
                         >
                           View Attendees
                         </Button>
@@ -748,6 +818,82 @@ export function EventsPortal({ user }: EventsPortalProps) {
           </TabsContent>
         )}
       </Tabs>
+
+    {/* Edit Event Dialog */}
+    <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Edit Event</DialogTitle>
+        </DialogHeader>
+        {editingEvent && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Event Title</label>
+                <Input value={editingEvent.title} onChange={(e) => setEditingEvent({ ...editingEvent, title: e.target.value })} />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Location</label>
+                <Input value={editingEvent.location} onChange={(e) => setEditingEvent({ ...editingEvent, location: e.target.value })} />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="text-sm font-medium">Start</label>
+                <Input type="datetime-local" value={editingEvent.date} onChange={(e) => setEditingEvent({ ...editingEvent, date: e.target.value })} />
+              </div>
+              <div>
+                <label className="text-sm font-medium">End</label>
+                <Input type="datetime-local" value={editingEvent.endDate} onChange={(e) => setEditingEvent({ ...editingEvent, endDate: e.target.value })} />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Max Attendees</label>
+                <Input type="number" value={editingEvent.maxAttendees} onChange={(e) => setEditingEvent({ ...editingEvent, maxAttendees: e.target.value })} />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Description</label>
+              <Textarea rows={4} value={editingEvent.description} onChange={(e) => setEditingEvent({ ...editingEvent, description: e.target.value })} />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+              <Button onClick={saveEditEvent} disabled={!canEditEvent(editingEvent)}>Save</Button>
+            </div>
+            {!canEditEvent(editingEvent) && (
+              <p className="text-xs text-red-600">Event cannot be edited within 24 hours of start time.</p>
+            )}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+
+    {/* Attendees Dialog */}
+    <Dialog open={attendeesDialogOpen} onOpenChange={setAttendeesDialogOpen}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Attendees</DialogTitle>
+        </DialogHeader>
+        <div className="max-h-[60vh] overflow-y-auto space-y-2">
+          {attendees.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No attendees yet.</p>
+          ) : attendees.map((a) => (
+            <div key={a.id} className="flex items-center justify-between p-2 border rounded">
+              <div className="flex items-center gap-2">
+                <Avatar className="w-6 h-6">
+                  <AvatarImage src={a.avatar || '/placeholder.svg'} />
+                  <AvatarFallback className="text-xs">{a.name?.split(' ').map((x:string)=>x[0]).join('')}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <div className="text-sm font-medium">{a.name}</div>
+                  <div className="text-xs text-muted-foreground">{a.email}</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs">{a.status}</Badge>
+            </div>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
     </div>
   );
 }

@@ -8,9 +8,6 @@ export const API_BASE_URL =
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
-  headers: {
-    "Content-Type": "application/json",
-  },
 });
 
 // Get auth token from localStorage (browser only)
@@ -35,6 +32,16 @@ async function request<T>(
       options.headers = {
         ...options.headers,
         Authorization: `Bearer ${token}`,
+      };
+    }
+
+    // Ensure proper Content-Type: JSON for objects, let browser set for FormData
+    const data = (options as any).data;
+    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
+    if (!isFormData) {
+      options.headers = {
+        'Content-Type': 'application/json',
+        ...options.headers,
       };
     }
 
@@ -136,6 +143,23 @@ export async function getMe(): Promise<{
   return request("/api/auth/me", { method: "GET" });
 }
 
+// Profile
+export async function getUserProfile(): Promise<{ success: boolean; data: { user: any } }> {
+  return request('/api/users/profile', { method: 'GET' });
+}
+
+export async function updateUserProfile(payload: any): Promise<{ success: boolean; message: string }> {
+  return request('/api/users/profile', { method: 'PUT', data: payload });
+}
+
+export async function uploadAvatar(formData: FormData): Promise<{ success: boolean; message: string }> {
+  const token = getAuthToken();
+  const headers: any = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const response = await apiClient.post('/api/users/avatar', formData, { headers });
+  return response.data;
+}
+
 export async function verifyOtp(payload: { email: string; code: string }): Promise<{
   success: boolean;
   message: string;
@@ -151,11 +175,18 @@ export async function resendOtp(payload: { email: string }): Promise<{
 }
 
 // Events
-export async function getEvents(): Promise<{
+export async function getEvents(params?: { sort?: string; order?: 'asc' | 'desc'; category?: string; search?: string; status?: string }): Promise<{
   success: boolean;
   data: { events: any[] };
 }> {
-  return request("/api/events", { method: "GET" });
+  const query = new URLSearchParams();
+  if (params?.sort) query.set('sort', params.sort);
+  if (params?.order) query.set('order', params.order);
+  if (params?.category && params.category !== 'all') query.set('category', params.category);
+  if (params?.search) query.set('search', params.search);
+  if (params?.status) query.set('status', params.status);
+  const qs = query.toString();
+  return request(`/api/events${qs ? `?${qs}` : ''}`, { method: "GET" });
 }
 
 export async function createEvent(payload: any): Promise<{
@@ -165,6 +196,14 @@ export async function createEvent(payload: any): Promise<{
   return request("/api/events", { method: "POST", data: payload });
 }
 
+export async function createEventForm(formData: FormData): Promise<{ success: boolean; data: { event: any } }> {
+  const token = getAuthToken();
+  const headers: any = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const response = await apiClient.post("/api/events", formData, { headers });
+  return response.data;
+}
+
 export async function toggleRsvp(eventId: string): Promise<{
   success: boolean;
   data: { event: any };
@@ -172,19 +211,106 @@ export async function toggleRsvp(eventId: string): Promise<{
   return request(`/api/events/${eventId}/rsvp`, { method: "POST" });
 }
 
+export async function updateEvent(eventId: string, payload: any): Promise<{ success: boolean; data: { event: any } }> {
+  return request(`/api/events/${eventId}`, { method: "PUT", data: payload });
+}
+
+export async function getEventAttendees(eventId: string): Promise<{ success: boolean; data: { attendees: any[] } }> {
+  return request(`/api/events/${eventId}/attendees`, { method: "GET" });
+}
+
 // Forums
-export async function getForumPosts(): Promise<{
+export async function getForumPosts(params?: { category?: string; search?: string; sort?: string; order?: 'asc' | 'desc' }): Promise<{
   success: boolean;
   data: { posts: any[] };
 }> {
-  return request("/api/forums/posts", { method: "GET" });
+  const query = new URLSearchParams();
+  if (params?.category && params.category !== 'all') query.set('category', params.category);
+  if (params?.search) query.set('search', params.search);
+  if (params?.sort) query.set('sort', params.sort);
+  if (params?.order) query.set('order', params.order);
+  const qs = query.toString();
+  return request(`/api/forums/posts${qs ? `?${qs}` : ''}`, { method: "GET" });
 }
 
-export async function createForumPost(payload: any): Promise<{
+export async function getForumPost(postId: string): Promise<{
   success: boolean;
   data: { post: any };
 }> {
-  return request("/api/forums/posts", { method: "POST", data: payload });
+  return request(`/api/forums/posts/${postId}`, { method: "GET" });
+}
+
+export async function createForumPost(formData: FormData): Promise<{
+  success: boolean;
+  data: { post: any };
+}> {
+  try {
+    const token = getAuthToken();
+    const headers: any = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    // Don't set Content-Type for FormData - let the browser set it with boundary
+    const response = await apiClient.post("/api/forums/posts", formData, { headers });
+    return response.data;
+  } catch (error: any) {
+    if (error.response?.status === 440) {
+      if (typeof window !== 'undefined') {
+        try { localStorage.removeItem('xerago-token'); } catch {}
+        window.location.href = '/app/(auth)/reset-password';
+      }
+    }
+    if (error.response) {
+      throw new Error(
+        error.response.data?.message ||
+          `Request failed: ${error.response.status}`
+      );
+    } else if (error.request) {
+      throw new Error("No response from server");
+    } else {
+      throw new Error(error.message || "Unexpected error");
+    }
+  }
+}
+
+export async function updateForumPost(postId: string, formData: FormData): Promise<{
+  success: boolean;
+  data: { post: any };
+}> {
+  try {
+    const token = getAuthToken();
+    const headers: any = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    // Don't set Content-Type for FormData - let the browser set it with boundary
+    const response = await apiClient.put(`/api/forums/posts/${postId}`, formData, { headers });
+    return response.data;
+  } catch (error: any) {
+    if (error.response?.status === 440) {
+      if (typeof window !== 'undefined') {
+        try { localStorage.removeItem('xerago-token'); } catch {}
+        window.location.href = '/app/(auth)/reset-password';
+      }
+    }
+    if (error.response) {
+      throw new Error(
+        error.response.data?.message ||
+          `Request failed: ${error.response.status}`
+      );
+    } else if (error.request) {
+      throw new Error("No response from server");
+    } else {
+      throw new Error(error.message || "Unexpected error");
+    }
+  }
+}
+
+export async function deleteForumPost(postId: string): Promise<{
+  success: boolean;
+  message: string;
+}> {
+  return request(`/api/forums/posts/${postId}`, { method: "DELETE" });
 }
 
 export async function likeForumPost(postId: string): Promise<{
@@ -204,12 +330,37 @@ export async function replyForumPost(
   });
 }
 
+export async function likeForumReply(postId: string, replyId: string): Promise<{
+  success: boolean;
+  data: { post: any };
+}> {
+  return request(`/api/forums/posts/${postId}/replies/${replyId}/like`, { method: "POST" });
+}
+
+// Admin forum moderation
+export async function updateForumPostApproval(postId: string, approvalStatus: 'pending' | 'approved' | 'rejected'): Promise<{
+  success: boolean;
+  message: string;
+  data: { post: any };
+}> {
+  return request(`/api/admin/forums/posts/${postId}/approval`, {
+    method: "PUT",
+    data: { approvalStatus },
+  });
+}
+
 // Articles
-export async function getArticles(): Promise<{
+export async function getArticles(params?: { sort?: string; order?: 'asc' | 'desc'; category?: string; search?: string }): Promise<{
   success: boolean;
   data: { articles: any[] };
 }> {
-  return request("/api/articles", { method: "GET" });
+  const query = new URLSearchParams();
+  if (params?.sort) query.set('sort', params.sort);
+  if (params?.order) query.set('order', params.order);
+  if (params?.category && params.category !== 'all') query.set('category', params.category);
+  if (params?.search) query.set('search', params.search);
+  const qs = query.toString();
+  return request(`/api/articles${qs ? `?${qs}` : ''}`, { method: "GET" });
 }
 
 export async function createArticle(payload: any): Promise<{
@@ -217,6 +368,22 @@ export async function createArticle(payload: any): Promise<{
   data: { article: any };
 }> {
   return request("/api/articles", { method: "POST", data: payload });
+}
+
+export async function createArticleForm(formData: FormData): Promise<{ success: boolean; data: { article: any } }> {
+  const token = getAuthToken();
+  const headers: any = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const response = await apiClient.post("/api/articles", formData, { headers });
+  return response.data;
+}
+
+export async function updateArticle(id: string, payload: any): Promise<{ success: boolean; data: { article: any } }> {
+  return request(`/api/articles/${id}`, { method: "PUT", data: payload });
+}
+
+export async function deleteArticle(id: string): Promise<{ success: boolean; message: string }> {
+  return request(`/api/articles/${id}`, { method: "DELETE" });
 }
 
 export async function likeArticle(articleId: string): Promise<{
@@ -231,6 +398,10 @@ export async function bookmarkArticle(articleId: string): Promise<{
   data: { article: any };
 }> {
   return request(`/api/articles/${articleId}/bookmark`, { method: "POST" });
+}
+
+export async function getArticle(id: string): Promise<{ success: boolean; data: { article: any } }> {
+  return request(`/api/articles/${id}`, { method: "GET" });
 }
 
 // Feed
@@ -399,7 +570,7 @@ export async function getAdminAnalytics(): Promise<{ success: boolean; data: { e
 }
 
 // Admin Content
-export async function adminListForumPosts(params: { page?: number; limit?: number; search?: string } = {}): Promise<{ success: boolean; data: { posts: any[]; total: number } }> {
+export async function adminListForumPosts(params: { page?: number; limit?: number; search?: string; approvalStatus?: string } = {}): Promise<{ success: boolean; data: { posts: any[]; total: number } }> {
   const query = new URLSearchParams();
   Object.entries(params).forEach(([k,v]) => { if (v !== undefined && v !== null) query.set(k, String(v)); });
   const qs = query.toString();

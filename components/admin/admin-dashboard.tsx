@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { getAdminStats, getAdminUsers, updateAdminUserRole, updateAdminUserStatus, getAdminReports, getAdminAnalytics, adminListForumPosts, adminDeleteForumPost, adminListArticles, adminUpdateArticleStatus, adminListAchievements, adminCreateAchievement, adminUpdateAchievement, adminDeleteAchievement, adminUpdateReportStatus, getDropdownOptions, adminCreateDropdownOption, adminUpdateDropdownOption, adminDeleteDropdownOption, getPointSettings, updatePointSettings } from "@/lib/api"
+import { getAdminStats, getAdminUsers, updateAdminUserRole, updateAdminUserStatus, getAdminReports, getAdminAnalytics, adminListForumPosts, adminDeleteForumPost, adminListArticles, adminUpdateArticleStatus, adminListAchievements, adminCreateAchievement, adminUpdateAchievement, adminDeleteAchievement, adminUpdateReportStatus, getDropdownOptions, adminCreateDropdownOption, adminUpdateDropdownOption, adminDeleteDropdownOption, getPointSettings, updatePointSettings, updateForumPostApproval } from "@/lib/api"
 import { useDropdownOptions } from "@/hooks/use-dropdown-options"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -490,7 +490,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <p className="text-sm text-muted-foreground">Total discussions</p>
                 <div className="mt-4 space-y-2">
                   <Button variant="outline" size="sm" className="w-full bg-transparent" onClick={async () => {
-                    const res = await adminListForumPosts({ page: 1, limit: 20 })
+                    const res = await adminListForumPosts({ page: 1, limit: 20, approvalStatus: 'pending' })
                     setForumList(res.data.posts || [])
                     setForumModalOpen(true)
                   }}>
@@ -574,13 +574,45 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               </DialogHeader>
               <div className="space-y-3 max-h-[60vh] overflow-y-auto">
                 {forumList.map((p) => (
-                  <div key={p._id} className="p-3 border rounded flex items-center justify-between">
-                    <div>
-                      <div className="font-medium">{p.title}</div>
-                      <div className="text-xs text-muted-foreground">{p.author?.name} • {new Date(p.createdAt).toLocaleString()}</div>
+                  <div key={p._id} className="p-3 border rounded">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <div className="font-medium">{p.title}</div>
+                        <div className="text-xs text-muted-foreground">{p.author?.name} • {new Date(p.createdAt).toLocaleString()}</div>
+                      </div>
+                      <Badge variant={p.approvalStatus === 'approved' ? 'default' : p.approvalStatus === 'pending' ? 'secondary' : 'destructive'}>
+                        {p.approvalStatus || 'pending'}
+                      </Badge>
                     </div>
+                    <div className="text-sm text-muted-foreground line-clamp-2 mb-2">{p.content}</div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={async () => { await adminDeleteForumPost(p._id); setForumList(forumList.filter(x => x._id !== p._id)); }}>Delete</Button>
+                      {p.approvalStatus !== 'approved' && (
+                        <Button variant="default" size="sm" onClick={async () => {
+                          await updateForumPostApproval(p._id, 'approved');
+                          setForumList(forumList.map(x => x._id === p._id ? { ...x, approvalStatus: 'approved' } : x));
+                        }}>
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Approve
+                        </Button>
+                      )}
+                      {p.approvalStatus !== 'rejected' && (
+                        <Button variant="outline" size="sm" onClick={async () => {
+                          await updateForumPostApproval(p._id, 'rejected');
+                          setForumList(forumList.map(x => x._id === p._id ? { ...x, approvalStatus: 'rejected' } : x));
+                        }}>
+                          <XCircle className="w-3 h-3 mr-1" />
+                          Reject
+                        </Button>
+                      )}
+                      <Button variant="destructive" size="sm" onClick={async () => {
+                        if (confirm('Are you sure you want to delete this post?')) {
+                          await adminDeleteForumPost(p._id);
+                          setForumList(forumList.filter(x => x._id !== p._id));
+                        }
+                      }}>
+                        <XCircle className="w-3 h-3 mr-1" />
+                        Delete
+                      </Button>
                     </div>
                   </div>
                 ))}
