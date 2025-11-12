@@ -70,7 +70,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("recent");
   const [articles, setArticles] = useState<any[]>(mockArticles);
-  const [pendingArticles, setPendingArticles] = useState([]);
+  const [pendingArticles, setPendingArticles] = useState<any[]>([]);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("browse");
   const [newArticle, setNewArticle] = useState({
@@ -90,6 +90,9 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
   const [editArticleErrors, setEditArticleErrors] = useState<any>({});
+  const [visibleBookmarked, setVisibleBookmarked] = useState(6);
+  const [visibleMy, setVisibleMy] = useState(6);
+  const [visiblePending, setVisiblePending] = useState(6);
 
   const isAdmin = user.role === "admin";
 
@@ -103,7 +106,31 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
   const { options: sortOptions, loading: sortOptionsLoading } =
     useDropdownOptions("article_sort");
 
-  const filteredArticles = articles.filter((article) => {
+  // Filter articles based on active tab
+  const getTabArticles = () => {
+    switch (activeTab) {
+      case "browse":
+        return isAdmin
+          ? articles
+          : articles.filter((a) => a.status === "published");
+      case "bookmarked":
+        return isAdmin
+          ? articles.filter((a) => a.isBookmarked)
+          : articles.filter((a) => a.isBookmarked && a.status === "published");
+      case "my-articles":
+        return articles.filter((a) => a.author.name === user.name);
+      case "approval":
+        return pendingArticles;
+      default:
+        return isAdmin
+          ? articles
+          : articles.filter((a) => a.status === "published");
+    }
+  };
+
+  const tabArticles = getTabArticles();
+
+  const filteredArticles = tabArticles.filter((article) => {
     const matchesCategory =
       selectedCategory === "all" ||
       article.category.toLowerCase() === selectedCategory.toLowerCase();
@@ -121,9 +148,11 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
     if (sortBy === "recent") {
       return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     } else if (sortBy === "popular") {
-      return b.views - a.views;
-    } else if (sortBy === "liked") {
-      return b.likes - a.likes;
+      return (b.views || 0) - (a.views || 0);
+    } else if (sortBy === "likes") {
+      return (b.likes || 0) - (a.likes || 0);
+    } else if (sortBy === "bookmarks") {
+      return (b.bookmarks || 0) - (a.bookmarks || 0);
     }
     return 0;
   });
@@ -283,37 +312,57 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
   useEffect(() => {
     (async () => {
       try {
-        const res = await getArticles();
-        setArticles(res.data.articles || []);
-      } catch {}
+        const params: {
+          category?: string;
+          sort?: string;
+          order?: "asc" | "desc";
+        } = {};
+        if (selectedCategory !== "all") params.category = selectedCategory;
+        if (sortBy) {
+          params.sort = sortBy;
+          params.order = "desc";
+        }
+
+        const res = await getArticles(params);
+        const allArticles = res.data.articles || [];
+        setArticles(allArticles);
+      } catch (e) {
+        console.error("Failed to fetch articles:", e);
+      }
     })();
-  }, []);
+  }, [selectedCategory, sortBy, isAdmin]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      setPendingArticles(articles.filter((a) => a.status !== "published"));
+    } else {
+      setPendingArticles([]);
+    }
+  }, [articles, isAdmin]);
 
   const handleDeleteArticle = (articleId: string) => {
     setArticles(articles.filter((article) => article.id !== articleId));
   };
 
   const handleApproveArticle = (articleId: string) => {
-    const article = pendingArticles.find((a: any) => a.id === articleId);
-    if (article) {
-      const publishedArticle = {
-        ...(article as any),
-        views: 0,
-        likes: 0,
-        bookmarks: 0,
+    setArticles((prev) => {
+      const existing = prev.find((article) => article.id === articleId);
+      if (!existing) return prev;
+      const updated = {
+        ...existing,
+        status: "published",
+        views: existing.views ?? 0,
+        likes: existing.likes ?? 0,
+        bookmarks: existing.bookmarks ?? 0,
         isBookmarked: false,
         isLiked: false,
-        status: "published",
       };
-      setArticles([publishedArticle, ...articles]);
-      setPendingArticles(
-        pendingArticles.filter((a: any) => a.id !== articleId)
-      );
-    }
+      return [updated, ...prev.filter((article) => article.id !== articleId)];
+    });
   };
 
   const handleRejectArticle = (articleId: string) => {
-    setPendingArticles(pendingArticles.filter((a: any) => a.id !== articleId));
+    setArticles((prev) => prev.filter((article) => article.id !== articleId));
   };
 
   const formatTimeAgo = (dateString: string) => {
@@ -368,11 +417,6 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
       ).length,
     })),
   ];
-
-  const bookmarkedArticles = articles.filter((article) => article.isBookmarked);
-  const myArticles = articles.filter(
-    (article) => article.author.name === user.name
-  );
 
   return (
     <div className="space-y-6">
@@ -793,7 +837,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
         </TabsContent>
 
         <TabsContent value="bookmarked" className="space-y-6">
-          {bookmarkedArticles.length === 0 ? (
+          {sortedArticles.length === 0 ? (
             <Card>
               <CardContent className="text-center py-12">
                 <Bookmark className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
@@ -810,10 +854,11 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
             </Card>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {bookmarkedArticles.map((article) => (
+              {sortedArticles.slice(0, visibleBookmarked).map((article) => (
                 <Card
                   key={article.id}
-                  className="hover:shadow-lg transition-shadow"
+                  className="hover:shadow-lg transition-shadow cursor-pointer"
+                  onClick={() => onViewArticle(article)}
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
@@ -829,6 +874,12 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                         >
                           {article.difficulty}
                         </Badge>
+                        {(isAdmin || article.author.name === user.name) &&
+                          article.status !== "published" && (
+                            <Badge className="text-xs bg-orange-100 text-orange-700 capitalize">
+                              {article.status}
+                            </Badge>
+                          )}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {article.readTime} min read
@@ -873,12 +924,22 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                   </CardContent>
                 </Card>
               ))}
+              {sortedArticles.length > visibleBookmarked && (
+                <div className="flex justify-center mt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setVisibleBookmarked((v) => v + 6)}
+                  >
+                    Load more
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </TabsContent>
 
         <TabsContent value="my-articles" className="space-y-6">
-          {myArticles.length === 0 ? (
+          {sortedArticles.length === 0 ? (
             <Card>
               <CardContent className="text-center py-12">
                 <FileText className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
@@ -894,10 +955,11 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
             </Card>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {myArticles.map((article) => (
+              {sortedArticles.slice(0, visibleMy).map((article) => (
                 <Card
                   key={article.id}
-                  className="hover:shadow-lg transition-shadow"
+                  className="hover:shadow-lg transition-shadow cursor-pointer"
+                  onClick={() => onViewArticle(article)}
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
@@ -913,6 +975,12 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                         >
                           {article.difficulty}
                         </Badge>
+                        {(isAdmin || article.author.name === user.name) &&
+                          article.status !== "published" && (
+                            <Badge className="text-xs bg-orange-100 text-orange-700 capitalize">
+                              {article.status}
+                            </Badge>
+                          )}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {article.readTime} min read
@@ -950,7 +1018,6 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                           )}
                       </div>
                       <div className="flex gap-2">
-                
                         <Button
                           variant="outline"
                           size="sm"
@@ -959,35 +1026,49 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                           <Eye className="w-3 h-3 mr-1" />
                           View
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onEditArticle(article)}
-                        >
-                          <Edit className="w-3 h-3 mr-1" />
-                          Edit
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onDeleteArticle(article)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-3 h-3 mr-1" />
-                          Delete
-                        </Button>
+                        {article.status !== "published" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onEditArticle(article)}
+                          >
+                            <Edit className="w-3 h-3 mr-1" />
+                            Edit
+                          </Button>
+                        )}
+                        {isAdmin && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onDeleteArticle(article)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-3 h-3 mr-1" />
+                            Delete
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </CardContent>
                 </Card>
               ))}
+              {sortedArticles.length > visibleMy && (
+                <div className="flex justify-center mt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setVisibleMy((v) => v + 6)}
+                  >
+                    Load more
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </TabsContent>
 
         {isAdmin && (
           <TabsContent value="approval" className="space-y-6">
-            {pendingArticles.length === 0 ? (
+            {sortedArticles.length === 0 ? (
               <Card>
                 <CardContent className="text-center py-12">
                   <FileText className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
@@ -1001,10 +1082,11 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
               </Card>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {pendingArticles.map((article: any) => (
+                {sortedArticles.slice(0, visiblePending).map((article: any) => (
                   <Card
                     key={article.id}
-                    className="hover:shadow-lg transition-shadow border-orange-200"
+                    className="hover:shadow-lg transition-shadow border-orange-200 cursor-pointer"
+                    onClick={() => onViewArticle(article)}
                   >
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">
@@ -1083,6 +1165,16 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                     </CardContent>
                   </Card>
                 ))}
+                {sortedArticles.length > visiblePending && (
+                  <div className="flex justify-center mt-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setVisiblePending((v) => v + 6)}
+                    >
+                      Load more
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </TabsContent>

@@ -352,7 +352,9 @@ export async function updateForumPostApproval(postId: string, approvalStatus: 'p
 // Articles
 export async function getArticles(params?: { sort?: string; order?: 'asc' | 'desc'; category?: string; search?: string }): Promise<{
   success: boolean;
-  data: { articles: any[] };
+  data: {
+    pending: any[]; articles: any[] 
+};
 }> {
   const query = new URLSearchParams();
   if (params?.sort) query.set('sort', params.sort);

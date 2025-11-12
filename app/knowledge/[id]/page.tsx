@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { getArticle } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 export default function KnowledgeDetailPage() {
   const params = useParams();
   const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
+  const router = useRouter();
   const [article, setArticle] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +34,24 @@ export default function KnowledgeDetailPage() {
 
   return (
     <div className="container mx-auto p-6 max-w-4xl">
+      <div className="mb-4">
+        <button
+          className="text-sm text-blue-600 hover:underline"
+          onClick={() => {
+            // try {
+            //   const tab = sessionStorage.getItem('kb:lastTab') || 'browse';
+            //   const category = sessionStorage.getItem('kb:lastCategory') || 'all';
+            //   const sort = sessionStorage.getItem('kb:lastSort') || 'recent';
+            //   router.push(`/knowledge?tab=${encodeURIComponent(tab)}&category=${encodeURIComponent(category)}&sort=${encodeURIComponent(sort)}`);
+            // } catch {
+            //   router.push('/knowledge');
+            // }
+            router.push('/');
+          }}
+        >
+          ← Back to Knowledge
+        </button>
+      </div>
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl">{article.title}</CardTitle>

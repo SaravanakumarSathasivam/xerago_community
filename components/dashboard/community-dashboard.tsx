@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -67,18 +72,20 @@ export function CommunityDashboard({
     const onAnyActivity = () => setLastActivity(Date.now());
     const interval = setInterval(() => {
       if (Date.now() - lastActivity > maxIdleMs) {
-        try { localStorage.removeItem('xerago-token'); } catch {}
+        try {
+          localStorage.removeItem("xerago-token");
+        } catch {}
         onLogout();
       }
     }, 60 * 1000);
-    window.addEventListener('mousemove', onAnyActivity);
-    window.addEventListener('keydown', onAnyActivity);
-    window.addEventListener('click', onAnyActivity);
+    window.addEventListener("mousemove", onAnyActivity);
+    window.addEventListener("keydown", onAnyActivity);
+    window.addEventListener("click", onAnyActivity);
     return () => {
       clearInterval(interval);
-      window.removeEventListener('mousemove', onAnyActivity);
-      window.removeEventListener('keydown', onAnyActivity);
-      window.removeEventListener('click', onAnyActivity);
+      window.removeEventListener("mousemove", onAnyActivity);
+      window.removeEventListener("keydown", onAnyActivity);
+      window.removeEventListener("click", onAnyActivity);
     };
   }, [lastActivity, onLogout]);
 
@@ -121,6 +128,16 @@ export function CommunityDashboard({
         return "bg-gray-100 text-gray-700";
     }
   };
+
+  useEffect(() => {
+    const tempActiveTab = localStorage.getItem("activeTab");
+    if (tempActiveTab) {
+      setActiveTab(tempActiveTab);
+    } else {
+      setActiveTab("feed");
+      localStorage.setItem("activeTab", "feed");
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -187,7 +204,14 @@ export function CommunityDashboard({
                   </div>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => { if (typeof window !== 'undefined') window.location.href = '/account/profile'; }}>Profile</DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      if (typeof window !== "undefined")
+                        window.location.href = "/account/profile";
+                    }}
+                  >
+                    Profile
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={onLogout}>Logout</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -302,7 +326,10 @@ export function CommunityDashboard({
           <div className="lg:col-span-3">
             <Tabs
               value={activeTab}
-              onValueChange={setActiveTab}
+              onValueChange={(value) => {
+                setActiveTab(value);
+                localStorage.setItem("activeTab", value);
+              }}
               className="space-y-6"
             >
               <TabsList
