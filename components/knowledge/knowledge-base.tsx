@@ -30,7 +30,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   BookOpen,
   Plus,
@@ -59,7 +58,11 @@ import {
 } from "@/lib/api";
 import Swal from "sweetalert2";
 import { useDropdownOptions } from "@/hooks/use-dropdown-options";
+import { SectionLoader } from "@/components/ui/section-loader";
 const mockArticles: any[] = [];
+
+const MAX_FILE_SIZE_MB_KNOWLEDGE = 5;
+const MAX_FILE_SIZE_BYTES_KNOWLEDGE = MAX_FILE_SIZE_MB_KNOWLEDGE * 1024 * 1024;
 
 interface KnowledgeBaseProps {
   user: any;
@@ -70,9 +73,8 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("recent");
   const [articles, setArticles] = useState<any[]>(mockArticles);
-  const [pendingArticles, setPendingArticles] = useState<any[]>([]);
+  const [loadingArticles, setLoadingArticles] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("browse");
   const [newArticle, setNewArticle] = useState({
     title: "",
     content: "",
@@ -90,9 +92,6 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
   const [editArticleErrors, setEditArticleErrors] = useState<any>({});
-  const [visibleBookmarked, setVisibleBookmarked] = useState(6);
-  const [visibleMy, setVisibleMy] = useState(6);
-  const [visiblePending, setVisiblePending] = useState(6);
 
   const isAdmin = user.role === "admin";
 
@@ -106,31 +105,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
   const { options: sortOptions, loading: sortOptionsLoading } =
     useDropdownOptions("article_sort");
 
-  // Filter articles based on active tab
-  const getTabArticles = () => {
-    switch (activeTab) {
-      case "browse":
-        return isAdmin
-          ? articles
-          : articles.filter((a) => a.status === "published");
-      case "bookmarked":
-        return isAdmin
-          ? articles.filter((a) => a.isBookmarked)
-          : articles.filter((a) => a.isBookmarked && a.status === "published");
-      case "my-articles":
-        return articles.filter((a) => a.author.name === user.name);
-      case "approval":
-        return pendingArticles;
-      default:
-        return isAdmin
-          ? articles
-          : articles.filter((a) => a.status === "published");
-    }
-  };
-
-  const tabArticles = getTabArticles();
-
-  const filteredArticles = tabArticles.filter((article) => {
+  const filteredArticles = articles.filter((article) => {
     const matchesCategory =
       selectedCategory === "all" ||
       article.category.toLowerCase() === selectedCategory.toLowerCase();
@@ -311,6 +286,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
 
   useEffect(() => {
     (async () => {
+      setLoadingArticles(true);
       try {
         const params: {
           category?: string;
@@ -328,42 +304,11 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
         setArticles(allArticles);
       } catch (e) {
         console.error("Failed to fetch articles:", e);
+      } finally {
+        setLoadingArticles(false);
       }
     })();
   }, [selectedCategory, sortBy, isAdmin]);
-
-  useEffect(() => {
-    if (isAdmin) {
-      setPendingArticles(articles.filter((a) => a.status !== "published"));
-    } else {
-      setPendingArticles([]);
-    }
-  }, [articles, isAdmin]);
-
-  const handleDeleteArticle = (articleId: string) => {
-    setArticles(articles.filter((article) => article.id !== articleId));
-  };
-
-  const handleApproveArticle = (articleId: string) => {
-    setArticles((prev) => {
-      const existing = prev.find((article) => article.id === articleId);
-      if (!existing) return prev;
-      const updated = {
-        ...existing,
-        status: "published",
-        views: existing.views ?? 0,
-        likes: existing.likes ?? 0,
-        bookmarks: existing.bookmarks ?? 0,
-        isBookmarked: false,
-        isLiked: false,
-      };
-      return [updated, ...prev.filter((article) => article.id !== articleId)];
-    });
-  };
-
-  const handleRejectArticle = (articleId: string) => {
-    setArticles((prev) => prev.filter((article) => article.id !== articleId));
-  };
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
@@ -408,12 +353,12 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
   };
 
   const categories = [
-    { id: "all", name: "All Categories", count: articles.length },
+    { id: "all", name: "All Categories", count: articles.filter((a) => a.status === "published").length },
     ...articleCategories.map((cat) => ({
       id: cat.value,
       name: cat.label,
       count: articles.filter(
-        (a) => a.category.toLowerCase() === cat.value.toLowerCase()
+        (a) => a.category.toLowerCase() === cat.value.toLowerCase() && a.status === "published"
       ).length,
     })),
   ];
@@ -551,32 +496,31 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                 />
                 {newArticleErrors.content && (
                   <p className="text-red-500 text-xs mt-1">
-                    {newArticleErrors.content}
+                      {newArticleErrors.content}
                   </p>
                 )}
               </div>
 
               <div>
-                <label className="text-sm font-medium">
-                  Tags (comma-separated)
-                </label>
-                <Input
-                  placeholder="e.g., AI, Marketing, Best Practices"
-                  value={newArticle.tags}
-                  onChange={(e) =>
-                    setNewArticle({ ...newArticle, tags: e.target.value })
-                  }
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium">Attachments</label>
+                <label className="text-sm font-medium">Attachments (max 3 files, {MAX_FILE_SIZE_MB_KNOWLEDGE}MB each)</label>
                 <Input
                   type="file"
                   multiple
-                  onChange={(e) =>
-                    setFiles(e.target.files ? Array.from(e.target.files) : [])
-                  }
+                  onChange={(e) => {
+                    const selectedFiles = Array.from(e.target.files || []);
+                    const validFiles = selectedFiles.filter((file) => {
+                      if (file.size > MAX_FILE_SIZE_BYTES_KNOWLEDGE) {
+                        Swal.fire({
+                          icon: "error",
+                          title: "File Too Large",
+                          text: `File ${file.name} exceeds the ${MAX_FILE_SIZE_MB_KNOWLEDGE}MB limit.`,
+                        });
+                        return false;
+                      }
+                      return true;
+                    });
+                    setFiles(validFiles);
+                  }}
                 />
                 {files.length > 0 && (
                   <p className="text-xs text-muted-foreground mt-1">
@@ -601,585 +545,228 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
         </Dialog>
       </div>
 
-      <Tabs
-        value={activeTab}
-        onValueChange={setActiveTab}
-        className="space-y-6"
-      >
-        <TabsList
-          className={`grid w-full ${isAdmin ? "grid-cols-4" : "grid-cols-3"}`}
-        >
-          <TabsTrigger value="browse">Browse All</TabsTrigger>
-          <TabsTrigger value="bookmarked">Bookmarked</TabsTrigger>
-          <TabsTrigger value="my-articles">My Articles</TabsTrigger>
-          {isAdmin && (
-            <TabsTrigger value="approval">
-              Pending Approval ({pendingArticles.length})
-            </TabsTrigger>
-          )}
-        </TabsList>
+      {/* Categories */}
+      <div className="flex flex-wrap gap-2">
+        {categories.map((category) => (
+          <Button
+            key={category.id}
+            variant={
+              selectedCategory === category.id ? "default" : "outline"
+            }
+            onClick={() => setSelectedCategory(category.id)}
+            size="sm"
+          >
+            {category.name} ({category.count})
+          </Button>
+        ))}
+      </div>
 
-        <TabsContent value="browse" className="space-y-6">
-          {/* Categories */}
-          <div className="flex flex-wrap gap-2">
-            {categories.map((category) => (
-              <Button
-                key={category.id}
-                variant={
-                  selectedCategory === category.id ? "default" : "outline"
-                }
-                onClick={() => setSelectedCategory(category.id)}
-                size="sm"
-              >
-                {category.name} ({category.count})
-              </Button>
+      {/* Search and Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+          <Input
+            placeholder="Search knowledge base..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-full sm:w-48">
+            <Filter className="w-4 h-4 mr-2" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {sortOptions.map((option) => (
+              <SelectItem key={option._id} value={option.value}>
+                {option.label}
+              </SelectItem>
             ))}
-          </div>
+          </SelectContent>
+        </Select>
+      </div>
 
-          {/* Search and Filters */}
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input
-                placeholder="Search knowledge base..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full sm:w-48">
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {sortOptions.map((option) => (
-                  <SelectItem key={option._id} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Articles */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {sortedArticles.map((article) => (
-              <Card
-                key={article.id}
-                className="hover:shadow-lg transition-shadow cursor-pointer"
-                onClick={() => onViewArticle(article)}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-2">
-                      {getTypeIcon(article.type)}
-                      <Badge variant="outline" className="text-xs">
-                        {article.type}
-                      </Badge>
-                      <Badge
-                        className={`text-xs ${getDifficultyColor(
-                          article.difficulty
-                        )}`}
-                      >
-                        {article.difficulty}
-                      </Badge>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {article.readTime} min read
-                    </div>
-                  </div>
-                  <CardTitle className="text-lg text-balance">
-                    {article.title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-muted-foreground text-pretty line-clamp-3">
-                    {article.content}
-                  </p>
-                  <div>
-                    <Button
-                      variant="link"
-                      className="px-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onViewArticle(article);
-                      }}
-                    >
-                      … Learn more
-                    </Button>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1">
-                    {article.tags
-                      .slice(0, 3)
-                      .map(
-                        (
-                          tag:
-                            | string
-                            | number
-                            | bigint
-                            | boolean
-                            | ReactElement<
-                                any,
-                                string | JSXElementConstructor<any>
-                              >
-                            | Iterable<ReactNode>
-                            | ReactPortal
-                            | Promise<AwaitedReactNode>
-                            | null
-                            | undefined,
-                          index: Key | null | undefined
-                        ) => (
-                          <Badge
-                            key={index}
-                            variant="secondary"
-                            className="text-xs"
-                          >
-                            #{tag}
-                          </Badge>
-                        )
-                      )}
-                    {article.tags.length > 3 && (
-                      <Badge variant="outline" className="text-xs">
-                        +{article.tags.length - 3}
+      {/* Articles */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {loadingArticles ? (
+          <SectionLoader />
+        ) : sortedArticles.map((article) => (
+          <Card
+            key={article.id}
+            className="hover:shadow-lg transition-shadow cursor-pointer"
+            onClick={() => onViewArticle(article)}
+          >
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center space-x-2">
+                  {getTypeIcon(article.type)}
+                  <Badge variant="outline" className="text-xs">
+                    {article.type}
+                  </Badge>
+                  <Badge
+                    className={`text-xs ${getDifficultyColor(
+                      article.difficulty
+                    )}`}
+                  >
+                    {article.difficulty}
+                  </Badge>
+                  {(isAdmin || article.author.name === user.name) &&
+                    article.status !== "published" && (
+                      <Badge className="text-xs bg-orange-100 text-orange-700 capitalize">
+                        {article.status}
                       </Badge>
                     )}
-                  </div>
-
-                  <div className="flex items-center justify-between pt-2 border-t">
-                    <div className="flex items-center space-x-3">
-                      <Avatar className="w-6 h-6">
-                        <AvatarImage
-                          src={article.author.avatar || "/placeholder.svg"}
-                          alt={article.author.name}
-                        />
-                        <AvatarFallback className="text-xs">
-                          {article.author.name
-                            .split(" ")
-                            .map((n: any[]) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="text-xs font-medium">
-                          {article.author.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatTimeAgo(article.updatedAt)}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <div className="flex items-center space-x-1 text-xs text-muted-foreground">
-                        <Eye className="w-3 h-3" />
-                        {article.views}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleLike(article.id);
-                        }}
-                        className={`p-1 h-auto ${
-                          article.isLiked ? "text-red-500" : ""
-                        }`}
-                      >
-                        <ThumbsUp
-                          className={`w-3 h-3 ${
-                            article.isLiked ? "fill-current" : ""
-                          }`}
-                        />
-                        <span className="ml-1 text-xs">{article.likes}</span>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleBookmark(article.id);
-                        }}
-                        className={`p-1 h-auto ${
-                          article.isBookmarked ? "text-blue-500" : ""
-                        }`}
-                      >
-                        <Bookmark
-                          className={`w-3 h-3 ${
-                            article.isBookmarked ? "fill-current" : ""
-                          }`}
-                        />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="p-1 h-auto"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const origin =
-                            typeof window !== "undefined"
-                              ? window.location.origin
-                              : "";
-                          const url = `${origin}/knowledge/${article.id}`;
-                          setShareUrl(url);
-                          setShareOpen(true);
-                        }}
-                      >
-                        <Share className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="bookmarked" className="space-y-6">
-          {sortedArticles.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-12">
-                <Bookmark className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">
-                  No bookmarked articles
-                </h3>
-                <p className="text-muted-foreground mb-4">
-                  Bookmark articles to save them for later reading
-                </p>
-                <Button onClick={() => setActiveTab("browse")}>
-                  Browse Articles
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {sortedArticles.slice(0, visibleBookmarked).map((article) => (
-                <Card
-                  key={article.id}
-                  className="hover:shadow-lg transition-shadow cursor-pointer"
-                  onClick={() => onViewArticle(article)}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center space-x-2">
-                        {getTypeIcon(article.type)}
-                        <Badge variant="outline" className="text-xs">
-                          {article.type}
-                        </Badge>
-                        <Badge
-                          className={`text-xs ${getDifficultyColor(
-                            article.difficulty
-                          )}`}
-                        >
-                          {article.difficulty}
-                        </Badge>
-                        {(isAdmin || article.author.name === user.name) &&
-                          article.status !== "published" && (
-                            <Badge className="text-xs bg-orange-100 text-orange-700 capitalize">
-                              {article.status}
-                            </Badge>
-                          )}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {article.readTime} min read
-                      </div>
-                    </div>
-                    <CardTitle className="text-lg text-balance">
-                      {article.title}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-sm text-muted-foreground text-pretty line-clamp-3">
-                      {article.content}
-                    </p>
-
-                    <div className="flex items-center justify-between pt-2 border-t">
-                      <div className="flex items-center space-x-3">
-                        <Avatar className="w-6 h-6">
-                          <AvatarImage
-                            src={article.author.avatar || "/placeholder.svg"}
-                            alt={article.author.name}
-                          />
-                          <AvatarFallback className="text-xs">
-                            {article.author.name
-                              .split(" ")
-                              .map((n: any[]) => n[0])
-                              .join("")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="text-xs font-medium">
-                            {article.author.name}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatTimeAgo(article.updatedAt)}
-                          </p>
-                        </div>
-                      </div>
-                      <Button variant="outline" size="sm">
-                        Read Article
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-              {sortedArticles.length > visibleBookmarked && (
-                <div className="flex justify-center mt-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setVisibleBookmarked((v) => v + 6)}
-                  >
-                    Load more
-                  </Button>
                 </div>
-              )}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="my-articles" className="space-y-6">
-          {sortedArticles.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-12">
-                <FileText className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No articles yet</h3>
-                <p className="text-muted-foreground mb-4">
-                  Share your knowledge and expertise with the team
-                </p>
-                <Button onClick={() => setIsCreateDialogOpen(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Article
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {sortedArticles.slice(0, visibleMy).map((article) => (
-                <Card
-                  key={article.id}
-                  className="hover:shadow-lg transition-shadow cursor-pointer"
-                  onClick={() => onViewArticle(article)}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center space-x-2">
-                        {getTypeIcon(article.type)}
-                        <Badge variant="outline" className="text-xs">
-                          {article.type}
-                        </Badge>
-                        <Badge
-                          className={`text-xs ${getDifficultyColor(
-                            article.difficulty
-                          )}`}
-                        >
-                          {article.difficulty}
-                        </Badge>
-                        {(isAdmin || article.author.name === user.name) &&
-                          article.status !== "published" && (
-                            <Badge className="text-xs bg-orange-100 text-orange-700 capitalize">
-                              {article.status}
-                            </Badge>
-                          )}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {article.readTime} min read
-                      </div>
-                    </div>
-                    <CardTitle className="text-lg text-balance">
-                      {article.title}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-sm text-muted-foreground text-pretty line-clamp-3">
-                      {article.content}
-                    </p>
-
-                    <div className="flex items-center justify-between pt-2 border-t">
-                      <div className="flex items-center space-x-4 text-xs text-muted-foreground">
-                        <div className="flex items-center space-x-1">
-                          <Eye className="w-3 h-3" />
-                          {article.views}
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <ThumbsUp className="w-3 h-3" />
-                          {article.likes}
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <Bookmark className="w-3 h-3" />
-                          {article.bookmarks}
-                        </div>
-                        {Array.isArray(article.attachments) &&
-                          article.attachments.length > 0 && (
-                            <div className="flex items-center space-x-1">
-                              <Paperclip className="w-3 h-3" />
-                              {article.attachments.length}
-                            </div>
-                          )}
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onViewArticle(article)}
-                        >
-                          <Eye className="w-3 h-3 mr-1" />
-                          View
-                        </Button>
-                        {article.status !== "published" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => onEditArticle(article)}
-                          >
-                            <Edit className="w-3 h-3 mr-1" />
-                            Edit
-                          </Button>
-                        )}
-                        {isAdmin && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => onDeleteArticle(article)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="w-3 h-3 mr-1" />
-                            Delete
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-              {sortedArticles.length > visibleMy && (
-                <div className="flex justify-center mt-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setVisibleMy((v) => v + 6)}
-                  >
-                    Load more
-                  </Button>
+                <div className="text-xs text-muted-foreground">
+                  {article.readTime} min read
                 </div>
-              )}
-            </div>
-          )}
-        </TabsContent>
+              </div>
+              <CardTitle className="text-lg text-balance">
+                {article.title}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground text-pretty line-clamp-3">
+                {article.content}
+              </p>
+              <div>
+                <Button
+                  variant="link"
+                  className="px-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onViewArticle(article);
+                  }}
+                >
+                  … Learn more
+                </Button>
+              </div>
 
-        {isAdmin && (
-          <TabsContent value="approval" className="space-y-6">
-            {sortedArticles.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-12">
-                  <FileText className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">
-                    No pending articles
-                  </h3>
-                  <p className="text-muted-foreground">
-                    All articles have been reviewed
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {sortedArticles.slice(0, visiblePending).map((article: any) => (
-                  <Card
-                    key={article.id}
-                    className="hover:shadow-lg transition-shadow border-orange-200 cursor-pointer"
-                    onClick={() => onViewArticle(article)}
-                  >
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center space-x-2">
-                          {getTypeIcon(article.type)}
-                          <Badge variant="outline" className="text-xs">
-                            {article.type}
-                          </Badge>
-                          <Badge className="text-xs bg-orange-100 text-orange-700">
-                            Pending Review
-                          </Badge>
-                        </div>
-                      </div>
-                      <CardTitle className="text-lg text-balance">
-                        {article.title}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <p className="text-sm text-muted-foreground text-pretty line-clamp-3">
-                        {article.content}
-                      </p>
-
-                      <div className="flex flex-wrap gap-1">
-                        {article.tags
-                          .slice(0, 3)
-                          .map((tag: string, index: number) => (
-                            <Badge
-                              key={index}
-                              variant="secondary"
-                              className="text-xs"
-                            >
-                              #{tag}
-                            </Badge>
-                          ))}
-                      </div>
-
-                      <div className="flex items-center justify-between pt-2 border-t">
-                        <div className="flex items-center space-x-3">
-                          <Avatar className="w-6 h-6">
-                            <AvatarFallback className="text-xs">
-                              {article.author.name
-                                .split(" ")
-                                .map((n: any[]) => n[0])
-                                .join("")}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="text-xs font-medium">
-                              {article.author.name}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {article.author.department}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleApproveArticle(article.id)}
-                            className="text-green-600 hover:text-green-700 hover:bg-green-50"
+              <div className="flex flex-wrap gap-1">
+                {article.tags
+                  .slice(0, 3)
+                  .map(
+                    (
+                      tag:
+                        | string
+                        | number
+                        | bigint
+                        | boolean
+                        | ReactElement<
+                            any,
+                            string | JSXElementConstructor<any>
                           >
-                            Approve
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleRejectArticle(article.id)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            Reject
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-                {sortedArticles.length > visiblePending && (
-                  <div className="flex justify-center mt-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => setVisiblePending((v) => v + 6)}
-                    >
-                      Load more
-                    </Button>
-                  </div>
+                        | Iterable<ReactNode>
+                        | ReactPortal
+                        | Promise<AwaitedReactNode>
+                        | null
+                        | undefined,
+                      index: Key | null | undefined
+                    ) => (
+                      <Badge
+                        key={index}
+                        variant="secondary"
+                        className="text-xs"
+                      >
+                        #{tag}
+                      </Badge>
+                    )
+                  )}
+                {article.tags.length > 3 && (
+                  <Badge variant="outline" className="text-xs">
+                    +{article.tags.length - 3}
+                  </Badge>
                 )}
               </div>
-            )}
-          </TabsContent>
-        )}
-      </Tabs>
+
+              <div className="flex items-center justify-between pt-2 border-t">
+                <div className="flex items-center space-x-3">
+                  <Avatar className="w-6 h-6">
+                    <AvatarImage
+                      src={article.author.avatar || "/placeholder.svg"}
+                      alt={article.author.name}
+                    />
+                    <AvatarFallback className="text-xs">
+                      {article.author.name
+                        .split(" ")
+                        .map((n: any[]) => n[0])
+                        .join("")}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-xs font-medium">
+                      {article.author.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatTimeAgo(article.updatedAt)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-1 text-xs text-muted-foreground">
+                    <Eye className="w-3 h-3" />
+                    {article.views}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleLike(article.id);
+                    }}
+                    className={`p-1 h-auto ${
+                      article.isLiked ? "text-red-500" : ""
+                    }`}
+                  >
+                    <ThumbsUp
+                      className={`w-3 h-3 ${
+                        article.isLiked ? "fill-current" : ""
+                      }`}
+                    />
+                    <span className="ml-1 text-xs">{article.likes}</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleBookmark(article.id);
+                    }}
+                    className={`p-1 h-auto ${
+                      article.isBookmarked ? "text-blue-500" : ""
+                    }`}
+                  >
+                    <Bookmark
+                      className={`w-3 h-3 ${
+                        article.isBookmarked ? "fill-current" : ""
+                      }`}
+                    />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="p-1 h-auto"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const origin =
+                        typeof window !== "undefined"
+                          ? window.location.origin
+                          : "";
+                      const url = `${origin}/knowledge/${article.id}`;
+                      setShareUrl(url);
+                      setShareOpen(true);
+                    }}
+                  >
+                    <Share className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
       {/* Share Dialog */}
       <Dialog open={shareOpen} onOpenChange={setShareOpen}>
@@ -1255,12 +842,23 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                 </div>
                 <div>
                   <label className="text-sm font-medium">Difficulty</label>
-                  <Input
+                  <Select
                     value={editing.difficulty}
-                    onChange={(e) =>
-                      setEditing({ ...editing, difficulty: e.target.value })
+                    onValueChange={(value) =>
+                      setEditing({ ...editing, difficulty: value })
                     }
-                  />
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {difficultyLevels.map((level) => (
+                        <SelectItem key={level._id} value={level.value}>
+                          {level.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <div>

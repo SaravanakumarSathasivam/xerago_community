@@ -174,6 +174,14 @@ export async function resendOtp(payload: { email: string }): Promise<{
   return request("/api/auth/resend-otp", { method: "POST", data: payload });
 }
 
+//Top Contributors
+export async function getTopContributors(): Promise<{
+  success: boolean;
+  data: { topContributors: any[] };
+}> {
+  return request("/api/leaderboard/top-contributors", { method: "GET" });
+}
+
 // Events
 export async function getEvents(params?: { sort?: string; order?: 'asc' | 'desc'; category?: string; search?: string; status?: string }): Promise<{
   success: boolean;
@@ -220,7 +228,7 @@ export async function getEventAttendees(eventId: string): Promise<{ success: boo
 }
 
 // Forums
-export async function getForumPosts(params?: { category?: string; search?: string; sort?: string; order?: 'asc' | 'desc' }): Promise<{
+export async function getForumPosts(params?: { category?: string; search?: string; sort?: string; order?: 'asc' | 'desc', approvalStatus?: string }): Promise<{
   success: boolean;
   data: { posts: any[] };
 }> {

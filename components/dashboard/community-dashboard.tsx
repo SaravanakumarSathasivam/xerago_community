@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, ReactNode } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -11,7 +12,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Bell,
   Search,
@@ -26,34 +26,52 @@ import {
   Calendar,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { DiscussionForums } from "@/components/forums/discussion-forums";
-import { KnowledgeBase } from "@/components/knowledge/knowledge-base";
 import { Leaderboard } from "@/components/gamification/leaderboard";
 import { AdminDashboard } from "@/components/admin/admin-dashboard";
 import { EventsPortal } from "@/components/events/events-portal";
 import { WelcomePopup } from "@/components/ui/welcome-popup";
-import { getFeed } from "@/lib/api";
+import { getFeed, getTopContributors } from "@/lib/api";
 import { formatTimestamp } from "@/helper/helper";
+import { useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 interface CommunityDashboardProps {
   user: any;
   onLogout: () => void;
+  children: ReactNode;
 }
 
 export function CommunityDashboard({
   user,
   onLogout,
+  children,
 }: CommunityDashboardProps) {
-  const [activeTab, setActiveTab] = useState("feed");
   const [searchQuery, setSearchQuery] = useState("");
   const [showWelcomePopup, setShowWelcomePopup] = useState(true);
   const [lastActivity, setLastActivity] = useState<number>(Date.now());
+  const router = useRouter();
+  const pathname = usePathname();
 
   const isAdmin = user.role === "admin";
 
   const [feedActivities, setFeedActivities] = useState<any[]>([]);
   const [feedPage, setFeedPage] = useState(1);
   const [feedHasMore, setFeedHasMore] = useState(true);
+
+  const [topContributors, setTopContributors] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchTopContributors = async () => {
+      try {
+        const res = await getTopContributors();
+        setTopContributors(res.data.topContributors);
+      } catch (error) {
+        console.error("Error fetching top contributors:", error);
+      }
+    };
+
+    fetchTopContributors();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -132,9 +150,10 @@ export function CommunityDashboard({
   useEffect(() => {
     const tempActiveTab = localStorage.getItem("activeTab");
     if (tempActiveTab) {
-      setActiveTab(tempActiveTab);
+      // setActiveTab(tempActiveTab); // This line is removed
+      localStorage.setItem("activeTab", tempActiveTab);
     } else {
-      setActiveTab("feed");
+      // setActiveTab("feed"); // This line is removed
       localStorage.setItem("activeTab", "feed");
     }
   }, []);
@@ -276,216 +295,104 @@ export function CommunityDashboard({
               </CardContent>
             </Card>
 
-            {/* Quick Actions */}
+            {/* Top Contributors */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Quick Actions</CardTitle>
+                <CardTitle className="text-lg">Top Contributors (Monthly)</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <Button
-                  variant="outline"
-                  className="w-full justify-start bg-transparent"
-                  size="sm"
-                  onClick={() => setActiveTab("forums")}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Discussion
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start bg-transparent"
-                  size="sm"
-                  onClick={() => setActiveTab("knowledge")}
-                >
-                  <BookOpen className="w-4 h-4 mr-2" />
-                  Share Knowledge
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start bg-transparent"
-                  size="sm"
-                  onClick={() => setActiveTab("events")}
-                >
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Upcoming Events
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start bg-transparent"
-                  size="sm"
-                  onClick={() => setActiveTab("leaderboard")}
-                >
-                  <Users className="w-4 h-4 mr-2" />
-                  Find Colleagues
-                </Button>
+              <CardContent className="space-y-4">
+                {topContributors.length > 0 ? (
+                  <div className="space-y-3">
+                    {topContributors.map((contributor) => (
+                      <div key={contributor.id} className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <Avatar className="w-8 h-8">
+                            <AvatarFallback>
+                              {contributor.name.split(" ").map((n: string) => n[0]).join("")}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="text-sm font-medium">{contributor.name}</p>
+                            <p className="text-xs text-muted-foreground">{contributor.contribution} Contributions</p>
+                          </div>
+                        </div>
+                        <Badge variant="secondary">{contributor.points} Points</Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No contributors yet this month.</p>
+                )}
               </CardContent>
             </Card>
           </div>
 
           {/* Main Content Area */}
           <div className="lg:col-span-3">
-            <Tabs
-              value={activeTab}
-              onValueChange={(value) => {
-                setActiveTab(value);
-                localStorage.setItem("activeTab", value);
-              }}
-              className="space-y-6"
+            <div
+              className={`flex h-10 items-center justify-between gap-2 border-b text-sm font-medium
+                ${isAdmin ? "grid-cols-6" : "grid-cols-5"}
+              }`}
             >
-              <TabsList
-                className={`grid w-full ${
-                  isAdmin ? "grid-cols-6" : "grid-cols-5"
+              <Link
+                href="/"
+                className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 text-center transition-all hover:bg-muted
+                  ${pathname === "/" ? "bg-muted text-foreground" : "text-muted-foreground"}
                 }`}
               >
-                <TabsTrigger value="feed" className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4" />
-                  <span className="hidden sm:inline">Feed</span>
-                </TabsTrigger>
-                <TabsTrigger value="forums" className="flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4" />
-                  <span className="hidden sm:inline">Forums</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="knowledge"
-                  className="flex items-center gap-2"
-                >
-                  <BookOpen className="w-4 h-4" />
-                  <span className="hidden sm:inline">Knowledge</span>
-                </TabsTrigger>
-                <TabsTrigger value="events" className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
-                  <span className="hidden sm:inline">Events</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="leaderboard"
-                  className="flex items-center gap-2"
-                >
-                  <Trophy className="w-4 h-4" />
-                  <span className="hidden sm:inline">Leaderboard</span>
-                </TabsTrigger>
-                {isAdmin && (
-                  <TabsTrigger
-                    value="admin"
-                    className="flex items-center gap-2"
-                  >
-                    <Settings className="w-4 h-4" />
-                    <span className="hidden sm:inline">Admin</span>
-                  </TabsTrigger>
-                )}
-              </TabsList>
-
-              <TabsContent value="feed" className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold">Community Feed</h3>
-                    <Badge variant="secondary">Latest Activity</Badge>
-                  </div>
-
-                  <div className="space-y-4">
-                    {feedActivities.map((activity) => (
-                      <Card
-                        key={activity.id}
-                        className="hover:shadow-md transition-shadow"
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex items-start space-x-3">
-                            <div
-                              className={`p-2 rounded-full ${getActivityColor(
-                                activity.type
-                              )}`}
-                            >
-                              {getActivityIcon(activity.type)}
-                            </div>
-                            <div className="flex-1 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <h4 className="font-medium text-sm">
-                                  {activity.title}
-                                </h4>
-                                <span className="text-xs text-muted-foreground">
-                                  {formatTimestamp(activity.timestamp)}
-                                </span>
-                              </div>
-                              <p className="text-sm text-muted-foreground">
-                                {activity.description}
-                              </p>
-                              <div className="flex items-center space-x-4 text-xs text-muted-foreground">
-                                <span className="font-medium">
-                                  {activity.author?.name}
-                                </span>
-                                <span>•</span>
-                                <span>{activity.author?.department}</span>
-                                <span>•</span>
-                                <div className="flex items-center space-x-3">
-                                  {activity.engagement?.likes !== undefined && (
-                                    <span>
-                                      {activity.engagement.likes}{" "}
-                                      {activity.engagement.likes === 1
-                                        ? "like"
-                                        : "likes"}
-                                    </span>
-                                  )}{" "}
-                                  {activity.engagement.comments !==
-                                    undefined && (
-                                    <span>
-                                      {activity.engagement.comments ?? 0}{" "}
-                                      {activity.engagement.comments === 1
-                                        ? "comment"
-                                        : "comments"}
-                                    </span>
-                                  )}
-                                  {activity.engagement.attendees && (
-                                    <span>
-                                      {activity.engagement.attendees} attendees
-                                    </span>
-                                  )}
-                                  {/* {activity.engagement.replies && <span>{activity.engagement.replies} replies</span>} */}
-                                  {/* {activity.engagement.congratulations && (
-                                    <span>{activity.engagement.congratulations} congratulations</span>
-                                  )} */}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                    {feedHasMore && (
-                      <div className="flex justify-center pt-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={loadMoreFeed}
-                        >
-                          Load more
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="forums">
-                <DiscussionForums user={user} />
-              </TabsContent>
-
-              <TabsContent value="knowledge">
-                <KnowledgeBase user={user} />
-              </TabsContent>
-
-              <TabsContent value="events">
-                <EventsPortal user={user} />
-              </TabsContent>
-
-              <TabsContent value="leaderboard">
-                <Leaderboard currentUser={user} />
-              </TabsContent>
-
+                <TrendingUp className="w-4 h-4" />
+                <span className="hidden sm:inline">Feed</span>
+              </Link>
+              <Link
+                href="/forums"
+                className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 text-center transition-all hover:bg-muted
+                  ${pathname === "/forums" ? "bg-muted text-foreground" : "text-muted-foreground"}
+                }`}
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span className="hidden sm:inline">Forums</span>
+              </Link>
+              <Link
+                href="/knowledge"
+                className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 text-center transition-all hover:bg-muted
+                  ${pathname === "/knowledge" ? "bg-muted text-foreground" : "text-muted-foreground"}
+                }`}
+              >
+                <BookOpen className="w-4 h-4" />
+                <span className="hidden sm:inline">Knowledge</span>
+              </Link>
+              <Link
+                href="/events"
+                className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 text-center transition-all hover:bg-muted
+                  ${pathname === "/events" ? "bg-muted text-foreground" : "text-muted-foreground"}
+                }`}
+              >
+                <Calendar className="w-4 h-4" />
+                <span className="hidden sm:inline">Events</span>
+              </Link>
+              <Link
+                href="/leaderboard"
+                className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 text-center transition-all hover:bg-muted
+                  ${pathname === "/leaderboard" ? "bg-muted text-foreground" : "text-muted-foreground"}
+                }`}
+              >
+                <Trophy className="w-4 h-4" />
+                <span className="hidden sm:inline">Leaderboard</span>
+              </Link>
               {isAdmin && (
-                <TabsContent value="admin">
-                  <AdminDashboard currentUser={user} />
-                </TabsContent>
+                <Link
+                  href="/admin"
+                  className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 text-center transition-all hover:bg-muted
+                    ${pathname === "/admin" ? "bg-muted text-foreground" : "text-muted-foreground"}
+                  }`}
+                >
+                  <Settings className="w-4 h-4" />
+                  <span className="hidden sm:inline">Admin</span>
+                </Link>
               )}
-            </Tabs>
+            </div>
+
+            {children}
           </div>
         </div>
       </div>

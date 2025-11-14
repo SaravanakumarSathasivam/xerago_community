@@ -73,7 +73,7 @@ const achievements = [
 ]
 
 interface LeaderboardProps {
-  currentUser: any
+  currentUser?: any | null
 }
 
 export function Leaderboard({ currentUser }: LeaderboardProps) {
