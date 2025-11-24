@@ -24,54 +24,27 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { getAdminUsers, updateAdminUserRole } from "@/lib/api";
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: "user" | "admin" | "super_admin";
-}
-
-// Mock API functions for now
-const mockGetUsers = async (): Promise<User[]> => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve([
-        { id: "1", name: "Alice Smith", email: "alice@example.com", role: "user" },
-        { id: "2", name: "Bob Johnson", email: "bob@example.com", role: "admin" },
-        { id: "3", name: "Charlie Brown", email: "charlie@example.com", role: "user" },
-        { id: "4", name: "Diana Prince", email: "diana@example.com", role: "super_admin" },
-      ]);
-    }, 500);
-  });
-};
-
-const mockUpdateUserRole = async (
-  userId: string,
-  newRole: "user" | "admin" | "super_admin"
-): Promise<User> => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      // In a real application, you'd update a database here
-      console.log(`Updating user ${userId} to role ${newRole}`);
-      // Simulate success
-      resolve({ id: userId, name: "Updated User", email: "updated@example.com", role: newRole });
-    }, 500);
-  });
-};
+// interface User {
+//   id: string;
+//   name: string;
+//   email: string;
+//   role: "user" | "admin" | "super_admin";
+// }
 
 interface UserManagementProps {
   currentUser: any;
 }
 
 export function UserManagement({ currentUser }: UserManagementProps) {
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<any>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
 
   const fetchUsers = async () => {
     setLoadingUsers(true);
     try {
-      const fetchedUsers = await mockGetUsers();
+      const fetchedUsers = await getAdminUsers();
       setUsers(fetchedUsers);
     } catch (error) {
       console.error("Failed to fetch users:", error);
@@ -109,9 +82,9 @@ export function UserManagement({ currentUser }: UserManagementProps) {
     }
 
     try {
-      await mockUpdateUserRole(userId, newRole);
-      setUsers((prevUsers) =>
-        prevUsers.map((user) =>
+      await updateAdminUserRole(userId, newRole);
+      setUsers((prevUsers: any[]) =>
+        prevUsers.map((user: any) =>
           user.id === userId ? { ...user, role: newRole } : user
         )
       );
@@ -149,7 +122,7 @@ export function UserManagement({ currentUser }: UserManagementProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((u) => (
+              {users.map((u: any) => (
                 <TableRow key={u.id}>
                   <TableCell>{u.name}</TableCell>
                   <TableCell>{u.email}</TableCell>
