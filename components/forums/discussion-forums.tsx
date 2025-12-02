@@ -50,12 +50,27 @@ import Swal from "sweetalert2";
 import { useDropdownOptions } from "@/hooks/use-dropdown-options";
 import { useRef } from "react";
 import { SectionLoader } from "@/components/ui/section-loader";
+import { IUser } from '@/models/user';
+import { IForum, IReply } from '@/models/forum';
+import { IAttachment } from '@/models/article';
+import { IDropdownOption } from '@/models/dropdown-option';
 
 const MAX_FILE_SIZE_MB_FORUM = 2;
 const MAX_FILE_SIZE_BYTES_FORUM = MAX_FILE_SIZE_MB_FORUM * 1024 * 1024;
 
+interface INewForumPost {
+  title: string;
+  content: string;
+  category: string;
+  tags: string;
+}
+
+interface IEditableForumPost extends INewForumPost {
+  _id: string;
+}
+
 interface DiscussionForumsProps {
-  user: any;
+  user: IUser;
 }
 
 export function DiscussionForums({ user }: DiscussionForumsProps) {
@@ -63,23 +78,23 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("");
   const [showPendingApproval, setShowPendingApproval] = useState(false);
-  const [posts, setPosts] = useState<any[]>([]);
+  const [posts, setPosts] = useState<IForum[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingPost, setEditingPost] = useState<any>(null);
-  const [newPost, setNewPost] = useState<any>({
+  const [editingPost, setEditingPost] = useState<IEditableForumPost | null>(null);
+  const [newPost, setNewPost] = useState<INewForumPost>({
     title: "",
     content: "",
     category: "",
     tags: "",
   });
-  const [selectedPost, setSelectedPost] = useState<any>(null);
+  const [selectedPost, setSelectedPost] = useState<IForum | null>(null);
   const [replyContent, setReplyContent] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
   const isAdmin = user.role === "admin";
 
@@ -94,6 +109,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
   }, [selectedCategory, searchQuery, sortBy, showPendingApproval]);
 
   const fetchPosts = async () => {
+    setLoadingPosts(true);
     try {
       const res = await getForumPosts({
         category: selectedCategory === "all" ? undefined : selectedCategory,
@@ -103,8 +119,10 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
         approvalStatus: showPendingApproval ? "pending" : undefined,
       });
       setPosts(res.data.posts || []);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to fetch posts:", error);
+    } finally {
+      setLoadingPosts(false);
     }
   };
 
@@ -112,30 +130,30 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
     try {
       const res = await getForumPost(postId);
       return res.data.post;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to fetch post details:", error);
       return null;
     }
   };
 
-  const filteredPosts = posts.filter((post) => {
+  const filteredPosts = posts.filter((post: IForum) => {
     const matchesSearch =
       searchQuery === "" ||
       post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       post.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      post.tags.some((tag: string) =>
+      post.tags?.some((tag: string) =>
         tag.toLowerCase().includes(searchQuery.toLowerCase())
       );
     return matchesSearch;
   });
 
-  const getRepliesCount = (p: any) =>
+  const getRepliesCount = (p: IForum) =>
     Array.isArray(p.replies) ? p.replies.length : p.replies || 0;
-  const sortedPosts = [...filteredPosts].sort((a, b) => {
+  const sortedPosts = [...filteredPosts].sort((a: IForum, b: IForum) => {
     if (sortBy === "recent") {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     } else if (sortBy === "popular") {
-      return b.likes - a.likes;
+      return (b.likes || []).length - (a.likes || []).length;
     } else if (sortBy === "discussed") {
       return getRepliesCount(b) - getRepliesCount(a);
     }
@@ -146,11 +164,11 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
     try {
       const res = await likeForumPost(postId);
       const updated = res.data.post;
-      setPosts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-      if (selectedPost?.id === postId) {
+      setPosts((prev) => prev.map((p: IForum) => (p._id === updated._id ? updated : p)));
+      if (selectedPost?._id === postId) {
         setSelectedPost({ ...selectedPost, ...updated });
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to like post:", error);
     }
   };
@@ -160,8 +178,8 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
       const res = await likeForumReply(postId, replyId);
       const updated = res.data.post;
       setSelectedPost(updated);
-      setPosts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-    } catch (error) {
+      setPosts((prev) => prev.map((p: IForum) => (p._id === updated._id ? updated : p)));
+    } catch (error: unknown) {
       console.error("Failed to like reply:", error);
     }
   };
@@ -169,24 +187,19 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
   const handleCreatePost = async () => {
     try {
       const formData = new FormData();
-      formData.append("title", editingPost?.title || "");
-      formData.append("content", editingPost?.content || "");
-      formData.append("category", editingPost?.category || "");
-      formData.append("tags", JSON.stringify(editingPost?.tags || []));
+      formData.append("title", newPost.title);
+      formData.append("content", newPost.content);
+      formData.append("category", newPost.category);
+      formData.append("tags", newPost.tags.split(",").map(tag => tag.trim()).filter(Boolean).join(","));
 
       selectedFiles.forEach((file) => {
-        console.log(file, "file");
         formData.append("attachments", file);
       });
-
-      for (const pair of formData.entries()) {
-        console.log(`${pair[0]}: ${pair[1]}`);
-      }
 
       const res = await apiCreateForumPost(formData);
       const created = res.data.post;
       setPosts((prev) => [created, ...prev]);
-      setEditingPost(null);
+      setNewPost({ title: "", content: "", category: "", tags: "" });
       setSelectedFiles([]);
       setFileInputKey((prev) => prev + 1);
       setIsCreateDialogOpen(false);
@@ -195,11 +208,11 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
         title: "Post created",
         text: "Your discussion was created.",
       });
-    } catch (error) {
+    } catch (error: unknown) {
       Swal.fire({
         icon: "error",
         title: "Create failed",
-        text: "Failed to create post",
+        text: (error as Error)?.message || "Failed to create post",
         timer: 3000,
       });
     }
@@ -212,16 +225,16 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
       formData.append("title", editingPost.title);
       formData.append("content", editingPost.content);
       formData.append("category", editingPost.category);
-      formData.append("tags", editingPost?.tags || []);
+      formData.append("tags", editingPost.tags.split(",").map(tag => tag.trim()).filter(Boolean).join(","));
 
       selectedFiles.forEach((file) => {
         formData.append("attachments", file);
       });
 
-      const res = await apiUpdateForumPost(editingPost.id, formData);
+      const res = await apiUpdateForumPost(editingPost._id, formData);
       const updated = res.data.post;
-      setPosts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-      if (selectedPost?.id === updated.id) {
+      setPosts((prev) => prev.map((p: IForum) => (p._id === updated._id ? updated : p)));
+      if (selectedPost?._id === updated._id) {
         setSelectedPost(updated);
       }
       setEditingPost(null);
@@ -233,11 +246,11 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
         title: "Post updated",
         text: "Changes saved.",
       });
-    } catch (error) {
+    } catch (error: unknown) {
       Swal.fire({
         icon: "error",
         title: "Update failed",
-        text: "Failed to update post",
+        text: (error as Error)?.message || "Failed to update post",
         timer: 3000,
       });
     }
@@ -247,18 +260,18 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
     if (!confirm("Are you sure you want to delete this post?")) return;
     try {
       await apiDeleteForumPost(postId);
-      setPosts((prev) => prev.filter((p) => p.id !== postId));
-      if (selectedPost?.id === postId) {
+      setPosts((prev) => prev.filter((p: IForum) => p._id !== postId));
+      if (selectedPost?._id === postId) {
         setIsViewDialogOpen(false);
         setSelectedPost(null);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to delete post:", error);
     }
   };
 
-  const handleViewPost = async (post: any) => {
-    const fullPost = await fetchPostDetails(post.id);
+  const handleViewPost = async (post: IForum) => {
+    const fullPost = await fetchPostDetails(post._id);
     if (fullPost) {
       setSelectedPost(fullPost);
       setIsViewDialogOpen(true);
@@ -268,14 +281,14 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
   const handleReply = async () => {
     if (!replyContent.trim() || !selectedPost) return;
     try {
-      const res = await replyForumPost(selectedPost.id, {
+      const res = await replyForumPost(selectedPost._id!, {
         content: replyContent,
       });
       const updated = res.data.post;
       setSelectedPost(updated);
-      setPosts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+      setPosts((prev) => prev.map((p: IForum) => (p._id === updated._id ? updated : p)));
       setReplyContent("");
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to add reply:", error);
     }
   };
@@ -302,13 +315,13 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const openEditDialog = (post: any) => {
+  const openEditDialog = (post: IForum) => {
     setEditingPost({
-      id: post.id,
+      _id: post._id!,
       title: post.title,
       content: post.content,
       category: post.category,
-      tags: post.tags.join(", "),
+      tags: post.tags?.join(", ") || "",
     });
     setSelectedFiles([]);
     setFileInputKey((prev) => prev + 1);
@@ -326,7 +339,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
         title: "Post Approved",
         text: "The forum post has been approved.",
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to approve post:", error);
       Swal.fire({
         icon: "error",
@@ -347,7 +360,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
         title: "Post Rejected",
         text: "The forum post has been rejected.",
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to reject post:", error);
       Swal.fire({
         icon: "error",
@@ -385,7 +398,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
         <Button
           className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
           onClick={() => {
-            setEditingPost({ title: "", content: "", category: "", tags: "" });
+            setNewPost({ title: "", content: "", category: "", tags: "" }); // Use setNewPost for creation
             setSelectedFiles([]);
             setFileInputKey((prev) => prev + 1);
             setIsCreateDialogOpen(true);
@@ -406,7 +419,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
           <MessageSquare className="w-5 h-5" />
           <span className="text-xs">All</span>
         </Button>
-        {forumCategories.map((category) => (
+        {forumCategories.map((category: IDropdownOption) => (
           <Button
             key={category._id}
             variant={
@@ -444,7 +457,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {sortOptions.map((option) => (
+            {sortOptions.map((option: IDropdownOption) => (
               <SelectItem key={option._id} value={option.value}>
                 <div className="flex items-center">
                   {option.value === "recent" && (
@@ -498,24 +511,24 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
             </CardContent>
           </Card>
         ) : (
-          sortedPosts.map((post) => {
+          sortedPosts.map((post: IForum) => {
             const category = forumCategories.find(
-              (cat) => cat.value === post.category
+              (cat: IDropdownOption) => cat.value === post.category
             );
             const isAuthor =
-              user?.id === post.author?.id || user?._id === post.author?.id;
+              (typeof post.author === 'object' && post.author !== null && user?._id === post.author._id);
             return (
-              <Card key={post.id} className="hover:shadow-md transition-shadow">
+              <Card key={post._id} className="hover:shadow-md transition-shadow">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center space-x-3">
                       <Avatar className="w-10 h-10">
                         <AvatarImage
-                          src={post.author.avatar || "/placeholder.svg"}
-                          alt={post.author.name}
+                          src={(typeof post.author === 'object' ? post.author.avatar : undefined) || "/placeholder.svg"}
+                          alt={(typeof post.author === 'object' ? post.author.name : post.author as string) || "User"}
                         />
                         <AvatarFallback>
-                          {post.author.name
+                          {((typeof post.author === 'object' ? post.author.name : post.author as string) || "U")
                             .split(" ")
                             .map((n: string) => n[0])
                             .join("")}
@@ -523,9 +536,9 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                       </Avatar>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="font-semibold">{post.author.name}</h3>
+                          <h3 className="font-semibold">{(typeof post.author === 'object' ? post.author.name : post.author as string)}</h3>
                           <Badge variant="secondary" className="text-xs">
-                            {post.author.department}
+                            {(typeof post.author === 'object' ? post.author.department : "Unknown")}
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground">
@@ -569,7 +582,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                   {post.attachments && post.attachments.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {post.attachments.map(
-                        (attachment: any, index: number) => (
+                        (attachment: IAttachment, index: number) => (
                           <a
                             key={index}
                             href={attachment.url}
@@ -606,15 +619,15 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleLike(post.id)}
-                        className={post.isLiked ? "text-blue-600" : ""}
+                        onClick={() => handleLike(post._id!)}
+                        className={post.likes.includes(user._id!) ? "text-blue-600" : ""}
                       >
                         <ThumbsUp
                           className={`w-4 h-4 mr-1 ${
-                            post.isLiked ? "fill-current" : ""
+                            post.likes.includes(user._id!) ? "fill-current" : ""
                           }`}
                         />
-                        {post.likes}
+                        {post.likes.length}
                       </Button>
                       <Button
                         variant="ghost"
@@ -622,9 +635,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                         onClick={() => handleViewPost(post)}
                       >
                         <Reply className="w-4 h-4 mr-1" />
-                        {Array.isArray(post.replies)
-                          ? post.replies.length
-                          : post.replies || 0}
+                        {post.replies?.length || 0}
                       </Button>
                       {Array.isArray(post.attachments) &&
                         post.attachments.length > 0 && (
@@ -640,7 +651,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleApprovePost(post.id)}
+                            onClick={() => handleApprovePost(post._id!)}
                             className="text-green-600 hover:text-green-700 hover:bg-green-50"
                           >
                             <CheckCircle className="w-4 h-4 mr-1" />
@@ -649,7 +660,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleRejectPost(post.id)}
+                            onClick={() => handleRejectPost(post._id!)}
                             className="text-red-600 hover:text-red-700 hover:bg-red-50"
                           >
                             <XCircle className="w-4 h-4 mr-1" />
@@ -681,7 +692,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleDeletePost(post.id)}
+                              onClick={() => handleDeletePost(post._id!)}
                               className="text-red-600 hover:text-red-700 hover:bg-red-50"
                             >
                               <Trash2 className="w-4 h-4 mr-1" />
@@ -713,11 +724,11 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                   <div className="flex items-center space-x-3">
                     <Avatar className="w-10 h-10">
                       <AvatarImage
-                        src={selectedPost.author.avatar || "/placeholder.svg"}
-                        alt={selectedPost.author.name}
+                        src={(typeof selectedPost.author === 'object' ? selectedPost.author.avatar : undefined) || "/placeholder.svg"}
+                        alt={(typeof selectedPost.author === 'object' ? selectedPost.author.name : selectedPost.author as string) || "User"}
                       />
                       <AvatarFallback>
-                        {selectedPost.author.name
+                        {((typeof selectedPost.author === 'object' ? selectedPost.author.name : selectedPost.author as string) || "U")
                           .split(" ")
                           .map((n: string) => n[0])
                           .join("")}
@@ -726,10 +737,10 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                     <div>
                       <div className="flex items-center gap-2">
                         <h3 className="font-semibold">
-                          {selectedPost.author.name}
+                          {(typeof selectedPost.author === 'object' ? selectedPost.author.name : selectedPost.author as string)}
                         </h3>
                         <Badge variant="secondary" className="text-xs">
-                          {selectedPost.author.department}
+                          {(typeof selectedPost.author === 'object' ? selectedPost.author.department : "Unknown")}
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
@@ -746,7 +757,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                     selectedPost.attachments.length > 0 && (
                       <div className="flex flex-wrap gap-2">
                         {selectedPost.attachments.map(
-                          (attachment: any, index: number) => (
+                          (attachment: IAttachment, index: number) => (
                             <a
                               key={index}
                               href={attachment.url}
@@ -765,15 +776,15 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleLike(selectedPost.id)}
-                      className={selectedPost.isLiked ? "text-blue-600" : ""}
+                      onClick={() => handleLike(selectedPost._id!)}
+                      className={selectedPost.likes.includes(user._id!) ? "text-blue-600" : ""}
                     >
                       <ThumbsUp
                         className={`w-4 h-4 mr-1 ${
-                          selectedPost.isLiked ? "fill-current" : ""
+                          selectedPost.likes.includes(user._id!) ? "fill-current" : ""
                         }`}
                       />
-                      {selectedPost.likes}
+                      {selectedPost.likes.length}
                     </Button>
                   </div>
                 </CardContent>
@@ -785,17 +796,17 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                   Replies ({selectedPost.replies?.length || 0})
                 </h3>
                 {selectedPost.replies && selectedPost.replies.length > 0 ? (
-                  selectedPost.replies.map((reply: any) => (
-                    <Card key={reply.id}>
+                  selectedPost.replies.map((reply: IReply) => (
+                    <Card key={reply._id}>
                       <CardContent className="pt-4">
                         <div className="flex items-start space-x-3">
                           <Avatar className="w-8 h-8">
                             <AvatarImage
-                              src={reply.author.avatar || "/placeholder.svg"}
-                              alt={reply.author.name}
+                              src={(typeof reply.author === 'object' ? reply.author.avatar : undefined) || "/placeholder.svg"}
+                              alt={(typeof reply.author === 'object' ? reply.author.name : reply.author as string) || "User"}
                             />
                             <AvatarFallback>
-                              {reply.author.name
+                              {((typeof reply.author === 'object' ? reply.author.name : reply.author as string) || "U")
                                 .split(" ")
                                 .map((n: string) => n[0])
                                 .join("")}
@@ -804,7 +815,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
                               <h4 className="font-semibold text-sm">
-                                {reply.author.name}
+                                {(typeof reply.author === 'object' ? reply.author.name : reply.author as string)}
                               </h4>
                               {reply.isSolution && (
                                 <Badge
@@ -826,16 +837,16 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                               variant="ghost"
                               size="sm"
                               onClick={() =>
-                                handleLikeReply(selectedPost.id, reply.id)
+                                handleLikeReply(selectedPost._id!, reply._id!)
                               }
-                              className={reply.isLiked ? "text-blue-600" : ""}
+                              className={reply.likes.includes(user._id!) ? "text-blue-600" : ""}
                             >
                               <ThumbsUp
                                 className={`w-3 h-3 mr-1 ${
-                                  reply.isLiked ? "fill-current" : ""
+                                  reply.likes.includes(user._id!) ? "fill-current" : ""
                                 }`}
                               />
-                              {reply.likes}
+                              {reply.likes.length}
                             </Button>
                           </div>
                         </div>
@@ -876,10 +887,16 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
 
       {/* Edit Post Dialog */}
       <Dialog
-        open={isEditDialogOpen ? isEditDialogOpen : isCreateDialogOpen}
-        onOpenChange={
-          isEditDialogOpen ? setIsEditDialogOpen : setIsCreateDialogOpen
-        }
+        open={isEditDialogOpen || isCreateDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsEditDialogOpen(false);
+            setIsCreateDialogOpen(false);
+            setEditingPost(null);
+            setNewPost({ title: "", content: "", category: "", tags: "" });
+            setSelectedFiles([]);
+          }
+        }}
       >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -887,9 +904,8 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
               {isEditDialogOpen ? "Edit Discussion" : "Create Discussion"}
             </DialogTitle>
           </DialogHeader>
-          {isEditDialogOpen ? (
-            editingPost && (
-              <div className="space-y-4">
+          {(isEditDialogOpen && editingPost) ? (
+            <div className="space-y-4">
                 <div>
                   <label className="text-sm font-medium">Title</label>
                   <Input
@@ -912,7 +928,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                       <SelectValue placeholder="Select a category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {forumCategories.map((category) => (
+                      {forumCategories.map((category: IDropdownOption) => (
                         <SelectItem key={category._id} value={category.value}>
                           {category.label}
                         </SelectItem>
@@ -940,18 +956,11 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                   </label>
                   <Input
                     placeholder="e.g., AI, Marketing, Best Practices"
-                    value={
-                      typeof editingPost.tags === "string"
-                        ? editingPost.tags
-                        : editingPost.tags.join(", ")
-                    }
+                    value={editingPost.tags}
                     onChange={(e) =>
                       setEditingPost({
                         ...editingPost,
-                        tags: e.target.value
-                          .split(",")
-                          .map((t: string) => t.trim())
-                          .filter(Boolean),
+                        tags: e.target.value,
                       })
                     }
                   />
@@ -1027,8 +1036,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                   </Button>
                 </div>
               </div>
-            )
-          ) : (
+            ) : (
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium">Title</label>
@@ -1052,7 +1060,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                     <SelectValue placeholder="Select a category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {forumCategories.map((category) => (
+                    {forumCategories.map((category: IDropdownOption) => (
                       <SelectItem key={category._id} value={category.value}>
                         {category.label}
                       </SelectItem>
@@ -1146,8 +1154,8 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                 <Button
                   variant="outline"
                   onClick={() => {
-                    setIsEditDialogOpen(false);
-                    setEditingPost(null);
+                    setIsCreateDialogOpen(false);
+                    setNewPost({ title: "", content: "", category: "", tags: "" });
                     setSelectedFiles([]);
                   }}
                 >

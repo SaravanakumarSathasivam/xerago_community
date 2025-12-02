@@ -55,22 +55,44 @@ import {
 } from "@/lib/api";
 import Swal from 'sweetalert2'
 import { useDropdownOptions } from "@/hooks/use-dropdown-options";
+import { IEvent, IAttendee } from "@/models/event";
+import { IUser } from '@/models/user';
+import { IDropdownOption } from '@/models/dropdown-option';
 
-// start with empty; populate via API
-const mockEvents: any[] = [];
+interface INewEvent {
+  title: string;
+  description: string;
+  date: string;
+  endDate: string;
+  location: string;
+  type: string;
+  category: string;
+  maxAttendees: string;
+  tags: string;
+}
+
+interface IEditableEvent extends INewEvent {
+  _id: string;
+}
+
+interface IEventCategory {
+  id: string;
+  name: string;
+  count: number;
+}
 
 interface EventsPortalProps {
-  user: any;
+  user: IUser;
 }
 
 export function EventsPortal({ user }: EventsPortalProps) {
-  const [events, setEvents] = useState<any[]>(mockEvents);
+  const [events, setEvents] = useState<IEvent[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("date");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
-  const [newEvent, setNewEvent] = useState({
+  const [newEvent, setNewEvent] = useState<INewEvent>({
     title: "",
     description: "",
     date: "",
@@ -81,11 +103,11 @@ export function EventsPortal({ user }: EventsPortalProps) {
     maxAttendees: "",
     tags: "",
   });
-  const [eventFiles, setEventFiles] = useState<File[]>([])
-  const [editDialogOpen, setEditDialogOpen] = useState(false)
-  const [attendeesDialogOpen, setAttendeesDialogOpen] = useState(false)
-  const [editingEvent, setEditingEvent] = useState<any | null>(null)
-  const [attendees, setAttendees] = useState<any[]>([])
+  const [eventFiles, setEventFiles] = useState<File[]>([]);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [attendeesDialogOpen, setAttendeesDialogOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<IEditableEvent | null>(null);
+  const [attendees, setAttendees] = useState<IAttendee[]>([]);
 
   // Fetch dropdown options from API
   const { options: eventTypes, loading: eventTypesLoading } = useDropdownOptions('event_type');
@@ -97,38 +119,38 @@ export function EventsPortal({ user }: EventsPortalProps) {
       try {
         const res = await getEvents();
         setEvents(res.data.events || []);
-      } catch (e) {
-        // swallow for now; UI stays empty
+      } catch (e: unknown) {
+        console.error("Failed to fetch events:", e);
       }
     })();
   }, []);
 
   const isAdmin = user.role === "admin";
 
-  const filteredEvents = events.filter((event) => {
+  const filteredEvents = events.filter((event: IEvent) => {
     const matchesCategory =
       selectedCategory === "all" || event.category === selectedCategory;
     const matchesSearch =
       searchQuery === "" ||
       event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       event.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      event.tags.some((tag: string) =>
+        event.tags?.some((tag: string) =>
         tag.toLowerCase().includes(searchQuery.toLowerCase())
       );
 
     const matchesTab =
       activeTab === "all" ||
-      (activeTab === "registered" && event.isRegistered) ||
-      (activeTab === "my-events" && event.organizer.name === user.name);
+      (activeTab === "registered" && event.attendees.some((attendee: IAttendee) => attendee.user === user._id)) ||
+      (activeTab === "my-events" && (event.organizer as unknown as IUser)._id === user._id);
 
     return matchesCategory && matchesSearch && matchesTab;
   });
 
-  const sortedEvents = [...filteredEvents].sort((a, b) => {
+  const sortedEvents = [...filteredEvents].sort((a: IEvent, b: IEvent) => {
     if (sortBy === "date") {
-      return new Date(a.date).getTime() - new Date(b.date).getTime();
+      return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
     } else if (sortBy === "popular") {
-      return b.attendees - a.attendees;
+      return (b.attendees as IAttendee[]).length - (a.attendees as IAttendee[]).length;
     }
     return 0;
   });
@@ -137,8 +159,10 @@ export function EventsPortal({ user }: EventsPortalProps) {
     try {
       const res = await toggleRsvp(eventId);
       const updated = res.data.event;
-      setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
-    } catch {}
+      setEvents((prev) => prev.map((e: IEvent) => (e._id === updated._id ? updated : e)));
+    } catch (e: unknown) {
+      console.error("Failed to toggle RSVP:", e);
+    }
   };
 
   const handleCreateEvent = async () => {
@@ -154,20 +178,20 @@ export function EventsPortal({ user }: EventsPortalProps) {
       const form = new FormData()
       form.append('title', newEvent.title)
       form.append('description', newEvent.description)
-      form.append('date', newEvent.date)
+      form.append('startDate', newEvent.date)
       form.append('endDate', newEvent.endDate || newEvent.date)
       form.append('location', newEvent.location)
       form.append('type', newEvent.type)
       form.append('category', newEvent.category)
       form.append('maxAttendees', newEvent.maxAttendees)
-      form.append('tags', newEvent.tags)
+      form.append('tags', newEvent.tags.split(',').map(tag => tag.trim()).filter(Boolean).join(','))
       eventFiles.forEach((f) => form.append('images', f))
       const res = await createEventForm(form);
       const created = res.data.event;
       setEvents((prev) => [created, ...prev]);
       Swal.fire({ icon: 'success', title: 'Event created', text: 'Your event was created successfully.' })
-    } catch (e: any) {
-      Swal.fire({ icon: 'error', title: 'Create failed', text: e?.message || 'Please try again.' })
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Create failed', text: (e as Error)?.message || 'Please try again.' })
     }
 
     setNewEvent({
@@ -185,8 +209,7 @@ export function EventsPortal({ user }: EventsPortalProps) {
     setIsCreateDialogOpen(false);
   };
 
-  const formatEventDate = (dateString: string) => {
-    const date = new Date(dateString);
+  const formatEventDate = (date: Date) => {
     return date.toLocaleDateString("en-US", {
       weekday: "short",
       month: "short",
@@ -224,40 +247,45 @@ export function EventsPortal({ user }: EventsPortalProps) {
     }
   };
 
-  const categories = [
+  const categories: IEventCategory[] = [
     { id: "all", name: "All Categories", count: events.length },
-    ...eventCategories.map((cat) => ({
+    ...eventCategories.map((cat: IDropdownOption) => ({
       id: cat.value,
       name: cat.label,
-      count: events.filter((e) => e.category === cat.value).length,
+      count: events.filter((e: IEvent) => e.category === cat.value).length,
     })),
   ];
 
-  const registeredEvents = events.filter((event) => event.isRegistered);
-  const myEvents = events.filter((event) => event.organizer.name === user.name);
+  const registeredEvents = events.filter((event: IEvent) => event.attendees.some((attendee: IAttendee) => attendee.user === user._id));
+  const myEvents = events.filter((event: IEvent) => (event.organizer as unknown as IUser)._id === user._id);
 
-  const getEventStatus = (eventDate: string) => {
+  const getEventStatus = (eventStartDate: Date, eventEndDate: Date) => {
     const now = new Date();
-    const eventDateTime = new Date(eventDate);
-    return eventDateTime > now ? "upcoming" : "completed";
+    if (now < eventStartDate) return "upcoming";
+    if (now > eventEndDate) return "completed";
+    return "ongoing";
   };
 
-  const canEditEvent = (event: any) => {
-    const now = new Date().getTime()
-    const start = new Date(event.date).getTime()
-    const diff = start - now
-    return diff > 24 * 60 * 60 * 1000
-  }
+  const canEditEvent = (event: { startDate: Date; status?: string } | { date: string; status?: string }) => {
+    const dateToCheck = 'startDate' in event ? event.startDate : new Date(event.date);
+    const now = new Date().getTime();
+    const start = new Date(dateToCheck).getTime();
+    const diff = start - now;
+    return diff > 24 * 60 * 60 * 1000;
+  };
 
-  const openEditEvent = (event: any) => {
+  const openEditEvent = (event: IEvent) => {
     setEditingEvent({
-      id: event.id,
+      _id: event._id!,
       title: event.title,
       description: event.description,
-      date: event.date?.slice(0,16),
-      endDate: event.endDate?.slice(0,16),
-      location: event.location,
-      maxAttendees: String(event.maxAttendees || ''),
+      date: new Date(event.startDate).toISOString().slice(0, 16),
+      endDate: new Date(event.endDate).toISOString().slice(0, 16),
+      location: event.location?.name || event.onlineDetails?.meetingLink || '',
+      type: event.type,
+      category: event.category,
+      maxAttendees: String(event.capacity || ''),
+      tags: event.tags?.join(',') || '',
     })
     setEditDialogOpen(true)
   }
@@ -265,27 +293,38 @@ export function EventsPortal({ user }: EventsPortalProps) {
   const saveEditEvent = async () => {
     if (!editingEvent) return
     try {
-      const res = await updateEvent(editingEvent.id, {
+      const res = await updateEvent(editingEvent._id!, {
         title: editingEvent.title,
         description: editingEvent.description,
-        date: editingEvent.date,
-        endDate: editingEvent.endDate,
-        location: editingEvent.location,
-        maxAttendees: editingEvent.maxAttendees,
+        startDate: new Date(editingEvent.date),
+        endDate: new Date(editingEvent.endDate),
+        location: { name: editingEvent.location },
+        capacity: Number(editingEvent.maxAttendees),
+        type: editingEvent.type as 'online' | 'offline' | 'hybrid',
+        category: editingEvent.category as 'workshop' | 'seminar' | 'meeting' | 'training' | 'conference' | 'social' | 'team-building' | 'presentation' | 'webinar' | 'other',
+        tags: editingEvent.tags.split(',').map(tag => tag.trim()),
       })
-      const updated = res.data.event
-      setEvents((prev) => prev.map((e) => e.id === updated.id ? updated : e))
+      const updated: IEvent = res.data.event
+      setEvents((prev) =>
+        prev.map((e: IEvent) =>
+          e._id === updated._id ? { ...e, ...updated } : e
+        )
+      );
       setEditDialogOpen(false)
       setEditingEvent(null)
-    } catch {}
+    } catch (e: unknown) {
+      console.error("Failed to save event:", e);
+    }
   }
 
-  const openAttendees = async (event: any) => {
+  const openAttendees = async (event: IEvent) => {
     try {
-      const res = await getEventAttendees(event.id)
+      const res = await getEventAttendees(event._id!)
       setAttendees(res.data.attendees || [])
       setAttendeesDialogOpen(true)
-    } catch {}
+    } catch (e: unknown) {
+      console.error("Failed to fetch attendees:", e);
+    }
   }
 
   return (
@@ -351,7 +390,7 @@ export function EventsPortal({ user }: EventsPortalProps) {
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
-                        {eventTypes.map((type) => (
+                        {eventTypes.map((type: IDropdownOption) => (
                           <SelectItem key={type._id} value={type.value}>
                             {type.label}
                           </SelectItem>
@@ -371,7 +410,7 @@ export function EventsPortal({ user }: EventsPortalProps) {
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
-                        {eventCategories.map((category) => (
+                        {eventCategories.map((category: IDropdownOption) => (
                           <SelectItem key={category._id} value={category.value}>
                             {category.label}
                           </SelectItem>
@@ -484,7 +523,7 @@ export function EventsPortal({ user }: EventsPortalProps) {
         <TabsContent value="all" className="space-y-6">
           {/* Categories */}
           <div className="flex flex-wrap gap-2">
-            {categories.map((category) => (
+            {categories.map((category: IEventCategory) => (
               <Button
                 key={category.id}
                 variant={
@@ -515,7 +554,7 @@ export function EventsPortal({ user }: EventsPortalProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {sortOptions.map((option) => (
+                {sortOptions.map((option: IDropdownOption) => (
                   <SelectItem key={option._id} value={option.value}>
                     {option.label}
                   </SelectItem>
@@ -526,9 +565,9 @@ export function EventsPortal({ user }: EventsPortalProps) {
 
           {/* Events Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {sortedEvents.map((event) => (
+            {sortedEvents.map((event: IEvent) => (
               <Card
-                key={event.id}
+                key={event._id}
                 className="hover:shadow-lg transition-shadow"
               >
                 <CardHeader className="pb-3">
@@ -539,13 +578,13 @@ export function EventsPortal({ user }: EventsPortalProps) {
                         {event.type}
                       </Badge>
                       <Badge
-                        className={`text-xs ${getStatusColor(event.status)}`}
+                        className={`text-xs ${getStatusColor(getEventStatus(new Date(event.startDate), new Date(event.endDate)))}`}
                       >
-                        {event.status}
+                        {getEventStatus(new Date(event.startDate), new Date(event.endDate))}
                       </Badge>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {event.attendees}/{event.maxAttendees} attending
+                      {event.attendees.length}/{event.capacity} attending
                     </div>
                   </div>
                   <CardTitle className="text-lg text-balance">
@@ -560,33 +599,20 @@ export function EventsPortal({ user }: EventsPortalProps) {
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center space-x-2 text-muted-foreground">
                       <CalendarDays className="w-4 h-4" />
-                      <span>{formatEventDate(event.date)}</span>
+                      <span>{formatEventDate(new Date(event.startDate))}</span>
                     </div>
                     <div className="flex items-center space-x-2 text-muted-foreground">
                       <MapPin className="w-4 h-4" />
-                      <span>{event.location}</span>
+                      <span>{event.location?.name || event.onlineDetails?.meetingLink}</span>
                     </div>
                   </div>
 
                   <div className="flex flex-wrap gap-1">
                     {event.tags
-                      .slice(0, 3)
+                      ?.slice(0, 3)
                       .map(
                         (
-                          tag:
-                            | string
-                            | number
-                            | bigint
-                            | boolean
-                            | ReactElement<
-                                any,
-                                string | JSXElementConstructor<any>
-                              >
-                            | Iterable<ReactNode>
-                            | ReactPortal
-                            | Promise<AwaitedReactNode>
-                            | null
-                            | undefined,
+                          tag: string,
                           index: Key | null | undefined
                         ) => (
                           <Badge
@@ -594,13 +620,13 @@ export function EventsPortal({ user }: EventsPortalProps) {
                             variant="secondary"
                             className="text-xs"
                           >
-                            #{tag}
+                            {tag}
                           </Badge>
                         )
                       )}
-                    {event.tags.length > 3 && (
+                    {event.tags?.length && event.tags.length > 3 && (
                       <Badge variant="outline" className="text-xs">
-                        +{event.tags.length - 3}
+                        +{event.tags?.length - 3}
                       </Badge>
                     )}
                   </div>
@@ -609,46 +635,50 @@ export function EventsPortal({ user }: EventsPortalProps) {
                     <div className="flex items-center space-x-3">
                       <Avatar className="w-6 h-6">
                         <AvatarImage
-                          src={event.organizer.avatar || "/placeholder.svg"}
-                          alt={event.organizer.name}
+                          src={(event.organizer as unknown as IUser).avatar || "/placeholder.svg"}
+                          alt={(event.organizer as unknown as IUser).name}
                         />
                         <AvatarFallback className="text-xs">
-                          {event.organizer.name
-                            .split(" ")
-                            .map((n: any[]) => n[0])
+                          {(event.organizer as unknown as IUser).name
+                            ?.split(" ")
+                            .map((n: string) => n[0])
                             .join("")}
                         </AvatarFallback>
                       </Avatar>
                       <div>
                         <p className="text-xs font-medium">
-                          {event.organizer.name}
+                          {(event.organizer as unknown as IUser).name}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {event.organizer.department}
+                          {(event.organizer as unknown as IUser).department}
                         </p>
                       </div>
                     </div>
 
                     <div className="flex items-center space-x-2">
-                      {Array.isArray((event as any).images) && (event as any).images.length > 0 && (
+                      {Array.isArray(event.images) && event.images.length > 0 && (
                         <span className="text-xs text-muted-foreground">
-                          {(event as any).images.length} image{(event as any).images.length > 1 ? 's' : ''}
+                          {event.images.length} image{event.images.length > 1 ? 's' : ''}
                         </span>
                       )}
                       <Button variant="ghost" size="sm" className="p-1 h-auto">
                         <Share className="w-3 h-3" />
                       </Button>
                       <Button
-                        variant={event.isRegistered ? "outline" : "default"}
+                        variant={event.attendees.some((attendee: IAttendee) => attendee.user === user._id)
+                          ? "outline"
+                          : "default"
+                        }
                         size="sm"
-                        onClick={() => handleRegister(event.id)}
+                        onClick={() => handleRegister(event._id!)}
                         disabled={
-                          event.status === "completed" ||
-                          (!event.isRegistered &&
-                            event.attendees >= event.maxAttendees)
+                          (event.attendees.some((attendee: IAttendee) => attendee.user === user._id) && getEventStatus(new Date(event.startDate), new Date(event.endDate)) === "completed") ||
+                          event.status === "cancelled"
                         }
                       >
-                        {event.isRegistered ? "Registered" : "Register"}
+                        {event.attendees.some((attendee: IAttendee) => attendee.user === user._id)
+                          ? "Registered"
+                          : "RSVP"}
                       </Button>
                     </div>
                   </div>
@@ -676,9 +706,9 @@ export function EventsPortal({ user }: EventsPortalProps) {
             </Card>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {registeredEvents.map((event) => (
+              {registeredEvents.map((event: IEvent) => (
                 <Card
-                  key={event.id}
+                  key={event._id}
                   className="hover:shadow-lg transition-shadow"
                 >
                   <CardHeader className="pb-3">
@@ -689,14 +719,13 @@ export function EventsPortal({ user }: EventsPortalProps) {
                           {event.type}
                         </Badge>
                         <Badge
-                          className={`text-xs ${
-                            getEventStatus(event.date) === "upcoming"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-gray-100 text-gray-700"
-                          }`}
+                          className={`text-xs ${getStatusColor(getEventStatus(new Date(event.startDate), new Date(event.endDate)))}`}
                         >
-                          {getEventStatus(event.date)}
+                          {getEventStatus(new Date(event.startDate), new Date(event.endDate))}
                         </Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {event.attendees.length}/{event.capacity} attending
                       </div>
                     </div>
                     <CardTitle className="text-lg text-balance">
@@ -707,11 +736,11 @@ export function EventsPortal({ user }: EventsPortalProps) {
                     <div className="space-y-2 text-sm">
                       <div className="flex items-center space-x-2 text-muted-foreground">
                         <CalendarDays className="w-4 h-4" />
-                        <span>{formatEventDate(event.date)}</span>
+                        <span>{formatEventDate(new Date(event.startDate))}</span>
                       </div>
                       <div className="flex items-center space-x-2 text-muted-foreground">
                         <MapPin className="w-4 h-4" />
-                        <span>{event.location}</span>
+                        <span>{event.location?.name || event.onlineDetails?.meetingLink}</span>
                       </div>
                     </div>
                     <Button
@@ -752,9 +781,9 @@ export function EventsPortal({ user }: EventsPortalProps) {
               </Card>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {myEvents.map((event) => (
+                {myEvents.map((event: IEvent) => (
                   <Card
-                    key={event.id}
+                    key={event._id}
                     className="hover:shadow-lg transition-shadow"
                   >
                     <CardHeader className="pb-3">
@@ -766,14 +795,14 @@ export function EventsPortal({ user }: EventsPortalProps) {
                           </Badge>
                           <Badge
                             className={`text-xs ${getStatusColor(
-                              event.status
+                              getEventStatus(new Date(event.startDate), new Date(event.endDate))
                             )}`}
                           >
-                            {event.status}
+                            {getEventStatus(new Date(event.startDate), new Date(event.endDate))}
                           </Badge>
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {event.attendees}/{event.maxAttendees} attending
+                          {event.attendees.length}/{event.capacity} attending
                         </div>
                       </div>
                       <CardTitle className="text-lg text-balance">
@@ -784,11 +813,11 @@ export function EventsPortal({ user }: EventsPortalProps) {
                       <div className="space-y-2 text-sm">
                         <div className="flex items-center space-x-2 text-muted-foreground">
                           <CalendarDays className="w-4 h-4" />
-                          <span>{formatEventDate(event.date)}</span>
+                          <span>{formatEventDate(new Date(event.startDate))}</span>
                         </div>
                         <div className="flex items-center space-x-2 text-muted-foreground">
                           <MapPin className="w-4 h-4" />
-                          <span>{event.location}</span>
+                          <span>{event.location?.name || event.onlineDetails?.meetingLink}</span>
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -821,7 +850,7 @@ export function EventsPortal({ user }: EventsPortalProps) {
 
     {/* Edit Event Dialog */}
     <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Event</DialogTitle>
         </DialogHeader>
@@ -876,8 +905,8 @@ export function EventsPortal({ user }: EventsPortalProps) {
         <div className="max-h-[60vh] overflow-y-auto space-y-2">
           {attendees.length === 0 ? (
             <p className="text-sm text-muted-foreground">No attendees yet.</p>
-          ) : attendees.map((a) => (
-            <div key={a.id} className="flex items-center justify-between p-2 border rounded">
+          ) : attendees.map((a: IAttendee) => (
+            <div key={a._id} className="flex items-center justify-between p-2 border rounded">
               <div className="flex items-center gap-2">
                 <Avatar className="w-6 h-6">
                   <AvatarImage src={a.avatar || '/placeholder.svg'} />

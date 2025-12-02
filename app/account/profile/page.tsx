@@ -6,12 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getUserProfile, updateUserProfile, uploadAvatar } from "@/lib/api";
+import { IUser } from '@/models/user';
 import Swal from "sweetalert2";
 import { useRouter } from "next/navigation";
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<IUser | null>(null);
   const [name, setName] = useState("");
   const [department, setDepartment] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -23,7 +24,7 @@ export default function ProfilePage() {
         setUser(res.data.user);
         setName(res.data.user?.name || "");
         setDepartment(res.data.user?.department || "");
-      } catch (e) {}
+      } catch (e: unknown) {}
     })();
   }, []);
 
@@ -32,8 +33,8 @@ export default function ProfilePage() {
       await updateUserProfile({ name, department });
       Swal.fire({ icon: 'success', title: 'Profile updated' });
       router.push('/');
-    } catch (e: any) {
-      Swal.fire({ icon: 'error', title: 'Update failed', text: e?.message || 'Please try again' });
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Update failed', text: (e as Error)?.message || 'Please try again' });
     }
   };
 
@@ -44,8 +45,8 @@ export default function ProfilePage() {
       form.append('avatar', avatarFile);
       await uploadAvatar(form);
       Swal.fire({ icon: 'success', title: 'Avatar updated' });
-    } catch (e: any) {
-      Swal.fire({ icon: 'error', title: 'Upload failed', text: e?.message || 'Please try again' });
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Upload failed', text: (e as Error)?.message || 'Please try again' });
     }
   };
 
@@ -59,7 +60,7 @@ export default function ProfilePage() {
           <div className="flex items-center gap-4">
             <Avatar className="w-16 h-16">
               {user?.avatar ? <AvatarImage src={user.avatar} alt={user.name} /> : (
-                <AvatarFallback>{(user?.name || 'U').split(' ').map((n: string) => n[0]).join('')}</AvatarFallback>
+                <AvatarFallback>{(user?.name || 'U').split(' ').map((n) => n[0]).join('')}</AvatarFallback>
               )}
             </Avatar>
             <div className="flex-1">

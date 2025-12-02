@@ -25,28 +25,31 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { getAdminUsers, updateAdminUserRole } from "@/lib/api";
+import { IUser } from '@/models/user';
 
-// interface User {
-//   id: string;
-//   name: string;
-//   email: string;
-//   role: "user" | "admin" | "super_admin";
-// }
+interface IAdminUserTable extends IUser {
+  id: string; // Map _id to id for convenience
+  status: "active" | "suspended"; // Assuming this is derived or comes from API
+}
 
 interface UserManagementProps {
-  currentUser: any;
+  currentUser: IUser;
 }
 
 export function UserManagement({ currentUser }: UserManagementProps) {
-  const [users, setUsers] = useState<any>([]);
+  const [users, setUsers] = useState<IAdminUserTable[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
 
   const fetchUsers = async () => {
     setLoadingUsers(true);
     try {
       const fetchedUsers = await getAdminUsers();
-      setUsers(fetchedUsers);
-    } catch (error) {
+      setUsers(fetchedUsers.data.users.map(u => ({
+        ...u,
+        id: u._id,
+        status: u.isActive ? "active" : "suspended"
+      })));
+    } catch (error: unknown) {
       console.error("Failed to fetch users:", error);
       Swal.fire({
         icon: "error",
@@ -72,7 +75,7 @@ export function UserManagement({ currentUser }: UserManagementProps) {
       return;
     }
 
-    if (currentUser.id === userId && newRole !== currentUser.role) {
+    if (currentUser._id === userId && newRole !== currentUser.role) {
       Swal.fire({
         icon: "error",
         title: "Permission Denied",
@@ -83,8 +86,8 @@ export function UserManagement({ currentUser }: UserManagementProps) {
 
     try {
       await updateAdminUserRole(userId, newRole);
-      setUsers((prevUsers: any[]) =>
-        prevUsers.map((user: any) =>
+      setUsers((prevUsers: IAdminUserTable[]) =>
+        prevUsers.map((user: IAdminUserTable) =>
           user.id === userId ? { ...user, role: newRole } : user
         )
       );
@@ -93,7 +96,7 @@ export function UserManagement({ currentUser }: UserManagementProps) {
         title: "Role Updated",
         text: `User role updated to ${newRole}.`,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to update user role:", error);
       Swal.fire({
         icon: "error",
@@ -122,7 +125,7 @@ export function UserManagement({ currentUser }: UserManagementProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((u: any) => (
+              {users.map((u: IAdminUserTable) => (
                 <TableRow key={u.id}>
                   <TableCell>{u.name}</TableCell>
                   <TableCell>{u.email}</TableCell>
@@ -132,7 +135,7 @@ export function UserManagement({ currentUser }: UserManagementProps) {
                       onValueChange={(newRole) =>
                         handleRoleChange(u.id, newRole as "user" | "admin" | "super_admin")
                       }
-                      disabled={currentUser.role !== "super_admin" && u.role === "super_admin"} // Only super admin can change super admin roles
+                      disabled={currentUser.role !== "super_admin" && u.role === "super_admin"} 
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select role" />
@@ -155,7 +158,7 @@ export function UserManagement({ currentUser }: UserManagementProps) {
                       onClick={() => handleRoleChange(u.id, u.role)}
                       disabled={
                         (currentUser.role !== "super_admin" && u.role === "super_admin") ||
-                        currentUser.id === u.id
+                        currentUser._id === u._id
                       }
                     >
                       Save

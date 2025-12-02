@@ -8,101 +8,47 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { Trophy, Medal, Award, Star, TrendingUp, Users, Calendar, Crown } from "lucide-react"
 
-import { getLeaderboard, getLeaderboardSummary, getAchievements, getCommunityStats, getMyLeaderboardSummary } from "@/lib/api"
-// const mockUsers: any[] = []
-
-interface User {
-  "id": string,
-  "name": any,
-  "department": string,
-  "avatar": string,
-  "points": number,
-  "level": number,
-  "badges": string[],
-  "weeklyPoints": number,
-  "monthlyPoints": number,
-  "postsCount": number,
-  "helpfulAnswers": number,
-  "streak": number,
-  "rank": number
-}
-
-const achievements = [
-  {
-    id: "first-post",
-    name: "First Post",
-    description: "Made your first discussion post",
-    icon: "🎯",
-    rarity: "common",
-  },
-  {
-    id: "helpful-member",
-    name: "Helpful Member",
-    description: "Received 10 likes on your posts",
-    icon: "👍",
-    rarity: "common",
-  },
-  {
-    id: "knowledge-sharer",
-    name: "Knowledge Sharer",
-    description: "Shared 5 knowledge articles",
-    icon: "📚",
-    rarity: "uncommon",
-  },
-  {
-    id: "top-contributor",
-    name: "Top Contributor",
-    description: "Ranked in top 10 contributors this month",
-    icon: "🏆",
-    rarity: "rare",
-  },
-  {
-    id: "innovation-leader",
-    name: "Innovation Leader",
-    description: "Led 3 innovative discussions",
-    icon: "💡",
-    rarity: "epic",
-  },
-  {
-    id: "community-champion",
-    name: "Community Champion",
-    description: "Helped 50+ colleagues with answers",
-    icon: "🌟",
-    rarity: "legendary",
-  },
-]
+import { getLeaderboard, getLeaderboardSummary, getAchievements, getCommunityStats, getMyLeaderboardSummary, LeaderboardResponse, LeaderboardSummaryResponse, AchievementsResponse, CommunityStatsResponse, MyLeaderboardSummaryResponse } from "@/lib/api"
+import { IUser } from '@/models/user';
+import { IAchievement } from '@/models/achievement';
+import { ILeaderboardUser, IEarnedAchievement } from '@/models/leaderboard';
 
 interface LeaderboardProps {
-  currentUser?: any | null
+  currentUser?: IUser | null;
 }
 
 export function Leaderboard({ currentUser }: LeaderboardProps) {
   const [activeTab, setActiveTab] = useState("overall")
-  const [users, setUsers] = useState<any[]>([]);
-  const [weekly, setWeekly] = useState<any>({ leaderboard: [], metrics: {} })
-  const [monthly, setMonthly] = useState<any>({ leaderboard: [], metrics: {} })
-  const [availableAchievements, setAvailableAchievements] = useState<any[]>([])
-  const [communityStats, setCommunityStats] = useState<{ activeMembers: number; totalPosts: number; totalArticles: number; helpfulAnswers: number } | undefined>()
-  const [mySummary, setMySummary] = useState<{ points: number; level: number; progressPercent: number; pointsToNext: number; earnedAchievements: any[] } | undefined>()
+  const [users, setUsers] = useState<ILeaderboardUser[]>([]);
+  const [weekly, setWeekly] = useState<LeaderboardSummaryResponse['data']>({ period: '', leaderboard: [], metrics: { totalPoints: 0, totalUsers: 0, totalAchievements: 0 } })
+  const [monthly, setMonthly] = useState<LeaderboardSummaryResponse['data']>({ period: '', leaderboard: [], metrics: { totalPoints: 0, totalUsers: 0, totalAchievements: 0 } })
+  const [availableAchievements, setAvailableAchievements] = useState<IAchievement[]>([])
+  const [communityStats, setCommunityStats] = useState<CommunityStatsResponse['data'] | undefined>()
+  const [mySummary, setMySummary] = useState<MyLeaderboardSummaryResponse['data'] | undefined>()
 
   useEffect(() => {
     ;(async () => {
       try {
-        const res = await getLeaderboard()
-        setUsers(res.data?.leaderboard || [])
-        const [w, m, a, cs, me] = await Promise.all([
+        const [leaderboardRes, weeklyRes, monthlyRes, achievementsRes, communityStatsRes, mySummaryRes] = await Promise.all([
+          getLeaderboard(),
           getLeaderboardSummary('weekly'),
           getLeaderboardSummary('monthly'),
           getAchievements(),
           getCommunityStats(),
           getMyLeaderboardSummary(),
         ])
-        setWeekly(w.data)
-        setMonthly(m.data)
-        setAvailableAchievements(a.data.achievements || [])
-        setCommunityStats(cs.data)
-        setMySummary(me.data)
-      } catch {}
+        setUsers(leaderboardRes.data?.leaderboard?.map((u: ILeaderboardUser) => ({
+          ...u,
+          id: u._id,
+        })) || []);
+        setWeekly(weeklyRes.data)
+        setMonthly(monthlyRes.data)
+        setAvailableAchievements(achievementsRes.data.achievements || [])
+        setCommunityStats(communityStatsRes.data)
+        setMySummary(mySummaryRes.data)
+      } catch (error: unknown) {
+        console.error("Error fetching leaderboard data:", error);
+      }
     })()
   }, [])
 
@@ -132,7 +78,7 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
     }
   }
 
-  const currentUserRank = users.findIndex((user) => user.name === currentUser.name) + 1
+  const currentUserRank = currentUser ? users.findIndex((user: ILeaderboardUser) => user._id === currentUser._id) + 1 : 0;
 
   return (
     <div className="space-y-6">
@@ -145,7 +91,7 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
           <p className="text-sm text-muted-foreground">Your Rank</p>
           <div className="flex items-center gap-2">
             {getRankIcon(currentUserRank || 999)}
-            <span className="text-2xl font-bold">#{currentUserRank || "N/A"}</span>
+            <span className="text-2xl font-bold">#{currentUserRank > 0 ? currentUserRank : "N/A"}</span>
           </div>
         </div>
       </div>
@@ -168,11 +114,11 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {users.map((user, index) => (
+                {users.map((user: ILeaderboardUser, index: number) => (
                   <div
-                    key={user.id}
+                    key={user._id}
                     className={`flex items-center justify-between p-4 rounded-lg border ${
-                      user.name === currentUser.name ? "bg-blue-50 border-blue-200 dark:bg-blue-950/20" : "bg-card"
+                      user._id === currentUser?._id ? "bg-blue-50 border-blue-200 dark:bg-blue-950/20" : "bg-card"
                     }`}
                   >
                     <div className="flex items-center space-x-4">
@@ -181,15 +127,15 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
                         <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
                         <AvatarFallback>
                           {user.name
-                            .split(" ")
-                            .map((n: any[]) => n[0])
+                            ?.split(" ")
+                            .map((n: string) => n[0])
                             .join("")}
                         </AvatarFallback>
                       </Avatar>
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="font-semibold">{user.name}</h3>
-                          {user.name === currentUser.name && (
+                          {user._id === currentUser?._id && (
                             <Badge variant="secondary" className="text-xs">
                               You
                             </Badge>
@@ -198,27 +144,27 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
                         <p className="text-sm text-muted-foreground">{user.department}</p>
                         <div className="flex items-center gap-2 mt-1">
                           <Badge variant="outline" className="text-xs">
-                            Level {user.level}
+                            Level {user.gamification?.level}
                           </Badge>
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <Star className="w-3 h-3" />
-                            {user.streak} day streak
+                            {user.gamification?.streak || 0} day streak
                           </div>
                         </div>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-2xl font-bold text-blue-600">{user.points.toLocaleString()}</div>
+                      <div className="text-2xl font-bold text-blue-600">{(user.gamification?.points || 0).toLocaleString()}</div>
                       <div className="text-sm text-muted-foreground">points</div>
                       <div className="flex gap-1 mt-2 justify-end">
-                        {user.badges.slice(0, 2).map((badge: string | number | bigint | boolean | ReactElement<any, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<AwaitedReactNode> | null | undefined, badgeIndex: Key | null | undefined) => (
+                        {user.gamification?.badges?.slice(0, 2).map((badge: string, badgeIndex: number) => (
                           <Badge key={badgeIndex} variant="secondary" className="text-xs">
                             {badge}
                           </Badge>
                         ))}
-                        {user.badges.length > 2 && (
+                        {user.gamification?.badges && user.gamification.badges.length > 2 && (
                           <Badge variant="outline" className="text-xs">
-                            +{user.badges.length - 2}
+                            +{user.gamification.badges.length - 2}
                           </Badge>
                         )}
                       </div>
@@ -241,11 +187,11 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
             <CardContent>
               <div className="space-y-4">
                 {weekly.leaderboard
-                  .map((user: User, index: number) => (
+                  .map((user: ILeaderboardUser, index: number) => (
                     <div
-                      key={user.id}
+                      key={user._id}
                       className={`flex items-center justify-between p-4 rounded-lg border ${
-                        user.name === currentUser.name ? "bg-green-50 border-green-200 dark:bg-green-950/20" : "bg-card"
+                        user._id === currentUser?._id ? "bg-green-50 border-green-200 dark:bg-green-950/20" : "bg-card"
                       }`}
                     >
                       <div className="flex items-center space-x-4">
@@ -254,15 +200,15 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
                           <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
                           <AvatarFallback>
                             {user.name
-                              .split(" ")
-                              .map((n: any[]) => n[0])
+                              ?.split(" ")
+                              .map((n: string) => n[0])
                               .join("")}
                           </AvatarFallback>
                         </Avatar>
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className="font-medium">{user.name}</h3>
-                            {user.name === currentUser.name && (
+                            {user._id === currentUser?._id && (
                               <Badge variant="secondary" className="text-xs">
                                 You
                               </Badge>
@@ -272,7 +218,7 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-xl font-bold text-green-600">+{user.points}</div>
+                        <div className="text-xl font-bold text-green-600">+{user.weeklyPoints}</div>
                         <div className="text-sm text-muted-foreground">this week</div>
                       </div>
                     </div>
@@ -292,12 +238,11 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {monthly.leaderboard
-                  .map((user: User, index: number) => (
+                {monthly.leaderboard?.map((user: ILeaderboardUser, index: number) => (
                     <div
-                      key={user.id}
+                      key={user._id}
                       className={`flex items-center justify-between p-4 rounded-lg border ${
-                        user.name === currentUser.name
+                        user._id === currentUser?._id
                           ? "bg-purple-50 border-purple-200 dark:bg-purple-950/20"
                           : "bg-card"
                       }`}
@@ -308,15 +253,15 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
                           <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
                           <AvatarFallback>
                             {user.name
-                              .split(" ")
-                              .map((n: any[]) => n[0])
+                              ?.split(" ")
+                              .map((n: string) => n[0])
                               .join("")}
                           </AvatarFallback>
                         </Avatar>
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className="font-medium">{user.name}</h3>
-                            {user.name === currentUser.name && (
+                            {user._id === currentUser?._id && (
                               <Badge variant="secondary" className="text-xs">
                                 You
                               </Badge>
@@ -326,7 +271,7 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-xl font-bold text-purple-600">+{user.points}</div>
+                        <div className="text-xl font-bold text-purple-600">+{user.monthlyPoints}</div>
                         <div className="text-sm text-muted-foreground">this month</div>
                       </div>
                     </div>
@@ -349,19 +294,19 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Level Progress</span>
-                    <span>Level {mySummary?.level ?? currentUser.level}</span>
+                    <span>Level {(mySummary?.level ?? currentUser?.gamification?.level) || 1}</span>
                   </div>
                   <Progress value={mySummary?.progressPercent ?? 0} className="h-2" />
-                  <p className="text-xs text-muted-foreground">{mySummary?.pointsToNext ?? 0} points to next level</p>
+                  <p className="text-xs text-muted-foreground">{(mySummary?.pointsToNext ?? 0)} points to next level</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 pt-4">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">{mySummary?.points ?? currentUser.points}</div>
+                    <div className="text-2xl font-bold text-blue-600">{(mySummary?.points ?? currentUser?.gamification?.points) || 0}</div>
                     <div className="text-sm text-muted-foreground">Total Points</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">{mySummary?.earnedAchievements?.length ?? currentUser.badges.length}</div>
+                    <div className="text-2xl font-bold text-green-600">{(mySummary?.earnedAchievements?.length ?? currentUser?.gamification?.achievements?.length) || 0}</div>
                     <div className="text-sm text-muted-foreground">Badges Earned</div>
                   </div>
                 </div>
@@ -404,11 +349,11 @@ export function Leaderboard({ currentUser }: LeaderboardProps) {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {availableAchievements.map((achievement) => (
+                {availableAchievements.map((achievement: IAchievement) => (
                   <div
-                    key={achievement.id}
+                    key={achievement._id}
                     className={`p-4 rounded-lg border-2 ${getRarityColor(achievement.rarity)} ${
-                      (mySummary?.earnedAchievements || []).some((ea) => (ea.name || '').toLowerCase() === (achievement.name || '').toLowerCase())
+                      (mySummary?.earnedAchievements || []).some((ea: IEarnedAchievement) => ea.achievement._id === achievement._id)
                         ? "opacity-100"
                         : "opacity-60"
                     }`}

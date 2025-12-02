@@ -29,8 +29,8 @@ export default function ResetPasswordPage() {
     try {
       await resetPassword({ token, password, confirmPassword: confirm })
       setMessage("Password has been reset. You can sign in now.")
-    } catch (err: any) {
-      setError(err?.message || "Failed to reset password")
+    } catch (err: unknown) {
+      setError((err as Error)?.message || "Failed to reset password")
     } finally {
       setLoading(false)
     }

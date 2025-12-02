@@ -9,6 +9,7 @@ import {
   ReactPortal,
   useEffect,
   useState,
+  useRef,
 } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,23 +60,44 @@ import {
 import Swal from "sweetalert2";
 import { useDropdownOptions } from "@/hooks/use-dropdown-options";
 import { SectionLoader } from "@/components/ui/section-loader";
-const mockArticles: any[] = [];
+import { IUser } from '@/models/user';
+import { IArticle, IAttachment } from '@/models/article';
+import { IDropdownOption } from '@/models/dropdown-option';
 
 const MAX_FILE_SIZE_MB_KNOWLEDGE = 5;
 const MAX_FILE_SIZE_BYTES_KNOWLEDGE = MAX_FILE_SIZE_MB_KNOWLEDGE * 1024 * 1024;
 
+interface INewArticle {
+  title: string;
+  content: string;
+  category: string;
+  type: string;
+  tags: string;
+  difficulty: string;
+}
+
+interface IEditableArticle extends INewArticle {
+  _id: string;
+}
+
+interface IArticleCategory {
+  id: string;
+  name: string;
+  count: number;
+}
+
 interface KnowledgeBaseProps {
-  user: any;
+  user: IUser;
 }
 
 export function KnowledgeBase({ user }: KnowledgeBaseProps) {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("recent");
-  const [articles, setArticles] = useState<any[]>(mockArticles);
+  const [articles, setArticles] = useState<IArticle[]>([]);
   const [loadingArticles, setLoadingArticles] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [newArticle, setNewArticle] = useState({
+  const [newArticle, setNewArticle] = useState<INewArticle>({
     title: "",
     content: "",
     category: "",
@@ -83,15 +105,14 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
     tags: "",
     difficulty: "Beginner",
   });
-  const [newArticleErrors, setNewArticleErrors] = useState<any>({});
+  const [newArticleErrors, setNewArticleErrors] = useState<Record<string, string>>({});
   const [shareOpen, setShareOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
   const [files, setFiles] = useState<File[]>([]);
-  const fileInputRef =
-    null as any as React.MutableRefObject<HTMLInputElement | null>;
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [editOpen, setEditOpen] = useState(false);
-  const [editing, setEditing] = useState<any | null>(null);
-  const [editArticleErrors, setEditArticleErrors] = useState<any>({});
+  const [editing, setEditing] = useState<IEditableArticle | null>(null);
+  const [editArticleErrors, setEditArticleErrors] = useState<Record<string, string>>({});
 
   const isAdmin = user.role === "admin";
 
@@ -105,7 +126,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
   const { options: sortOptions, loading: sortOptionsLoading } =
     useDropdownOptions("article_sort");
 
-  const filteredArticles = articles.filter((article) => {
+  const filteredArticles = articles.filter((article: IArticle) => {
     const matchesCategory =
       selectedCategory === "all" ||
       article.category.toLowerCase() === selectedCategory.toLowerCase();
@@ -113,21 +134,21 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
       searchQuery === "" ||
       article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       article.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      article.tags.some((tag: string) =>
+      (article.tags || []).some((tag: string) =>
         tag.toLowerCase().includes(searchQuery.toLowerCase())
       );
     return matchesCategory && matchesSearch;
   });
 
-  const sortedArticles = [...filteredArticles].sort((a, b) => {
+  const sortedArticles = [...filteredArticles].sort((a: IArticle, b: IArticle) => {
     if (sortBy === "recent") {
       return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     } else if (sortBy === "popular") {
       return (b.views || 0) - (a.views || 0);
     } else if (sortBy === "likes") {
-      return (b.likes || 0) - (a.likes || 0);
+      return (b.likes || []).length - (a.likes || []).length;
     } else if (sortBy === "bookmarks") {
-      return (b.bookmarks || 0) - (a.bookmarks || 0);
+      return (b.bookmarks || []).length - (a.bookmarks || []).length;
     }
     return 0;
   });
@@ -137,9 +158,11 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
       const res = await likeArticle(articleId);
       const updated = res.data.article;
       setArticles((prev) =>
-        prev.map((a) => (a.id === updated.id ? updated : a))
+        prev.map((a: IArticle) => (a._id === updated._id ? updated : a))
       );
-    } catch {}
+    } catch (e: unknown) {
+      console.error("Failed to like article:", e);
+    }
   };
 
   const handleBookmark = async (articleId: string) => {
@@ -147,13 +170,15 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
       const res = await bookmarkArticle(articleId);
       const updated = res.data.article;
       setArticles((prev) =>
-        prev.map((a) => (a.id === updated.id ? updated : a))
+        prev.map((a: IArticle) => (a._id === updated._id ? updated : a))
       );
-    } catch {}
+    } catch (e: unknown) {
+      console.error("Failed to bookmark article:", e);
+    }
   };
 
   const handleCreateArticle = async () => {
-    const errors: any = {};
+    const errors: Record<string, string> = {};
     if (!newArticle.title) errors.title = "Title is required";
     if (!newArticle.content) errors.content = "Content is required";
     if (!newArticle.category) errors.category = "Category is required";
@@ -170,9 +195,9 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
       form.append("content", newArticle.content);
       form.append("category", newArticle.category);
       form.append("type", newArticle.type);
-      form.append("tags", newArticle.tags);
+      form.append("tags", newArticle.tags.split(",").map(tag => tag.trim()).filter(Boolean).join(","));
       form.append("difficulty", newArticle.difficulty);
-      files.forEach((f) => form.append("images", f));
+      files.forEach((f) => form.append("attachments", f));
       const res = await createArticleForm(form);
       const created = res.data.article;
       setArticles((prev) => [{ ...created }, ...prev]);
@@ -181,7 +206,13 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
         title: "Article submitted",
         text: "Your article was submitted for approval.",
       });
-    } catch {}
+    } catch (e: unknown) {
+      Swal.fire({
+        icon: "error",
+        title: "Create failed",
+        text: (e as Error)?.message || "Please try again.",
+      });
+    }
 
     setNewArticle({
       title: "",
@@ -195,14 +226,14 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
     setIsCreateDialogOpen(false);
   };
 
-  const onViewArticle = (article: any) => {
+  const onViewArticle = (article: IArticle) => {
     if (typeof window !== "undefined")
-      window.location.href = `/knowledge/${article.id}`;
+      window.location.href = `/knowledge/${article._id}`;
   };
 
-  const onEditArticle = (article: any) => {
+  const onEditArticle = (article: IArticle) => {
     setEditing({
-      id: article.id,
+      _id: article._id!,
       title: article.title,
       content: article.content,
       category: article.category,
@@ -216,7 +247,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
   const onSaveEdit = async () => {
     if (!editing) return;
 
-    const errors: any = {};
+    const errors: Record<string, string> = {};
     if (!editing.title) errors.title = "Title is required";
     if (!editing.content) errors.content = "Content is required";
     if (!editing.category) errors.category = "Category is required";
@@ -229,17 +260,17 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
     setEditArticleErrors({});
 
     try {
-      const res = await updateArticle(editing.id, {
+      const res = await updateArticle(editing._id, {
         title: editing.title,
         content: editing.content,
-        category: editing.category,
-        type: editing.type,
-        tags: editing.tags,
-        difficulty: editing.difficulty,
+        category: editing.category as 'technology' | 'marketing' | 'analytics' | 'ai' | 'business' | 'tutorial' | 'news' | 'case-study' | 'best-practices' | 'tools',
+        type: editing.type as 'guide' | 'tutorial' | 'checklist' | 'comparison',
+        tags: editing.tags.split(",").map(tag => tag.trim()).filter(Boolean),
+        difficulty: editing.difficulty as 'Beginner' | 'Intermediate' | 'Advanced',
       });
       const updated = res.data.article;
       setArticles((prev) =>
-        prev.map((a) => (a.id === updated.id ? updated : a))
+        prev.map((a: IArticle) => (a._id === updated._id ? updated : a))
       );
       setEditOpen(false);
       setEditing(null);
@@ -248,16 +279,16 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
         title: "Updated",
         text: "Article updated successfully.",
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       Swal.fire({
         icon: "error",
         title: "Update failed",
-        text: e?.message || "Please try again.",
+        text: (e as Error)?.message || "Please try again.",
       });
     }
   };
 
-  const onDeleteArticle = async (article: any) => {
+  const onDeleteArticle = async (article: IArticle) => {
     const result = await Swal.fire({
       icon: "warning",
       title: "Delete article?",
@@ -268,18 +299,18 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
     });
     if (!result.isConfirmed) return;
     try {
-      await deleteArticle(article.id);
-      setArticles((prev) => prev.filter((a) => a.id !== article.id));
+      await deleteArticle(article._id!);
+      setArticles((prev) => prev.filter((a: IArticle) => a._id !== article._id));
       Swal.fire({
         icon: "success",
         title: "Deleted",
         text: "Article deleted.",
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       Swal.fire({
         icon: "error",
         title: "Delete failed",
-        text: e?.message || "Please try again.",
+        text: (e as Error)?.message || "Please try again.",
       });
     }
   };
@@ -292,23 +323,27 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
           category?: string;
           sort?: string;
           order?: "asc" | "desc";
+          search?: string;
         } = {};
         if (selectedCategory !== "all") params.category = selectedCategory;
         if (sortBy) {
           params.sort = sortBy;
           params.order = "desc";
         }
+        if (searchQuery) {
+          params.search = searchQuery;
+        }
 
         const res = await getArticles(params);
         const allArticles = res.data.articles || [];
         setArticles(allArticles);
-      } catch (e) {
+      } catch (e: unknown) {
         console.error("Failed to fetch articles:", e);
       } finally {
         setLoadingArticles(false);
       }
     })();
-  }, [selectedCategory, sortBy, isAdmin]);
+  }, [selectedCategory, sortBy, searchQuery, isAdmin]);
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
@@ -352,13 +387,13 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
     }
   };
 
-  const categories = [
+  const categories: IArticleCategory[] = [
     { id: "all", name: "All Categories", count: articles.filter((a) => a.status === "published").length },
-    ...articleCategories.map((cat) => ({
+    ...articleCategories.map((cat: IDropdownOption) => ({
       id: cat.value,
       name: cat.label,
       count: articles.filter(
-        (a) => a.category.toLowerCase() === cat.value.toLowerCase() && a.status === "published"
+        (a: IArticle) => a.category.toLowerCase() === cat.value.toLowerCase() && a.status === "published"
       ).length,
     })),
   ];
@@ -418,7 +453,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {categories.slice(1).map((category) => (
+                      {categories.slice(1).map((category: IArticleCategory) => (
                         <SelectItem key={category.id} value={category.id}>
                           {category.name}
                         </SelectItem>
@@ -443,12 +478,13 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                     }
                   >
                     <SelectTrigger
-                      className={newArticleErrors.type ? "border-red-500" : ""}
+                      className={newArticleErrors.type ? "border-red-500" : ""
+                      }
                     >
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                     <SelectContent>
-                      {articleTypes.map((type) => (
+                      {articleTypes.map((type: IDropdownOption) => (
                         <SelectItem key={type._id} value={type.value}>
                           {type.label}
                         </SelectItem>
@@ -473,7 +509,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {difficultyLevels.map((level) => (
+                      {difficultyLevels.map((level: IDropdownOption) => (
                         <SelectItem key={level._id} value={level.value}>
                           {level.label}
                         </SelectItem>
@@ -547,7 +583,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
 
       {/* Categories */}
       <div className="flex flex-wrap gap-2">
-        {categories.map((category) => (
+        {categories.map((category: IArticleCategory) => (
           <Button
             key={category.id}
             variant={
@@ -578,7 +614,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {sortOptions.map((option) => (
+            {sortOptions.map((option: IDropdownOption) => (
               <SelectItem key={option._id} value={option.value}>
                 {option.label}
               </SelectItem>
@@ -591,9 +627,9 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {loadingArticles ? (
           <SectionLoader />
-        ) : sortedArticles.map((article) => (
+        ) : sortedArticles.map((article: IArticle) => (
           <Card
-            key={article.id}
+            key={article._id}
             className="hover:shadow-lg transition-shadow cursor-pointer"
             onClick={() => onViewArticle(article)}
           >
@@ -611,7 +647,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                   >
                     {article.difficulty}
                   </Badge>
-                  {(isAdmin || article.author.name === user.name) &&
+                  {(isAdmin || (typeof article.author === 'object' && article.author !== null && user._id === article.author._id)) &&
                     article.status !== "published" && (
                       <Badge className="text-xs bg-orange-100 text-orange-700 capitalize">
                         {article.status}
@@ -619,7 +655,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                     )}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {article.readTime} min read
+                  {article.readingTime} min read
                 </div>
               </div>
               <CardTitle className="text-lg text-balance">
@@ -648,20 +684,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                   .slice(0, 3)
                   .map(
                     (
-                      tag:
-                        | string
-                        | number
-                        | bigint
-                        | boolean
-                        | ReactElement<
-                            any,
-                            string | JSXElementConstructor<any>
-                          >
-                        | Iterable<ReactNode>
-                        | ReactPortal
-                        | Promise<AwaitedReactNode>
-                        | null
-                        | undefined,
+                      tag: string,
                       index: Key | null | undefined
                     ) => (
                       <Badge
@@ -684,19 +707,19 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                 <div className="flex items-center space-x-3">
                   <Avatar className="w-6 h-6">
                     <AvatarImage
-                      src={article.author.avatar || "/placeholder.svg"}
-                      alt={article.author.name}
+                      src={(typeof article.author === 'object' ? article.author.avatar : undefined) || "/placeholder.svg"}
+                      alt={(typeof article.author === 'object' ? article.author.name : article.author as string) || "User"}
                     />
                     <AvatarFallback className="text-xs">
-                      {article.author.name
+                      {((typeof article.author === 'object' ? article.author.name : article.author as string) || "U")
                         .split(" ")
-                        .map((n: any[]) => n[0])
+                        .map((n: string) => n[0])
                         .join("")}
                     </AvatarFallback>
                   </Avatar>
                   <div>
                     <p className="text-xs font-medium">
-                      {article.author.name}
+                      {(typeof article.author === 'object' ? article.author.name : article.author as string)}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {formatTimeAgo(article.updatedAt)}
@@ -714,33 +737,33 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleLike(article.id);
+                      handleLike(article._id!);
                     }}
                     className={`p-1 h-auto ${
-                      article.isLiked ? "text-red-500" : ""
+                      (article.likes || []).includes(user._id!) ? "text-red-500" : ""
                     }`}
                   >
                     <ThumbsUp
                       className={`w-3 h-3 ${
-                        article.isLiked ? "fill-current" : ""
+                        (article.likes || []).includes(user._id!) ? "fill-current" : ""
                       }`}
                     />
-                    <span className="ml-1 text-xs">{article.likes}</span>
+                    <span className="ml-1 text-xs">{(article.likes || []).length}</span>
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleBookmark(article.id);
+                      handleBookmark(article._id!);
                     }}
                     className={`p-1 h-auto ${
-                      article.isBookmarked ? "text-blue-500" : ""
+                      (article.bookmarks || []).includes(user._id!) ? "text-blue-500" : ""
                     }`}
                   >
                     <Bookmark
                       className={`w-3 h-3 ${
-                        article.isBookmarked ? "fill-current" : ""
+                        (article.bookmarks || []).includes(user._id!) ? "fill-current" : ""
                       }`}
                     />
                   </Button>
@@ -754,7 +777,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                         typeof window !== "undefined"
                           ? window.location.origin
                           : "";
-                      const url = `${origin}/knowledge/${article.id}`;
+                      const url = `${origin}/knowledge/${article._id}`;
                       setShareUrl(url);
                       setShareOpen(true);
                     }}
@@ -812,12 +835,27 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                 </div>
                 <div>
                   <label className="text-sm font-medium">Category</label>
-                  <Input
+                  <Select
                     value={editing.category}
-                    onChange={(e) =>
-                      setEditing({ ...editing, category: e.target.value })
+                    onValueChange={(value) =>
+                      setEditing({ ...editing, category: value })
                     }
-                  />
+                  >
+                    <SelectTrigger
+                      className={
+                        editArticleErrors.category ? "border-red-500" : ""
+                      }
+                    >
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {articleCategories.map((category: IDropdownOption) => (
+                        <SelectItem key={category._id} value={category.value}>
+                          {category.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {editArticleErrors.category && (
                     <p className="text-red-500 text-xs mt-1">
                       {editArticleErrors.category}
@@ -828,12 +866,25 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium">Type</label>
-                  <Input
+                  <Select
                     value={editing.type}
-                    onChange={(e) =>
-                      setEditing({ ...editing, type: e.target.value })
+                    onValueChange={(value) =>
+                      setEditing({ ...editing, type: value })
                     }
-                  />
+                  >
+                    <SelectTrigger
+                      className={editArticleErrors.type ? "border-red-500" : ""}
+                    >
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {articleTypes.map((type: IDropdownOption) => (
+                        <SelectItem key={type._id} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {editArticleErrors.type && (
                     <p className="text-red-500 text-xs mt-1">
                       {editArticleErrors.type}
@@ -852,7 +903,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {difficultyLevels.map((level) => (
+                      {difficultyLevels.map((level: IDropdownOption) => (
                         <SelectItem key={level._id} value={level.value}>
                           {level.label}
                         </SelectItem>

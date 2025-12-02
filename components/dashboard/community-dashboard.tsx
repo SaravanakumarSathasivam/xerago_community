@@ -30,13 +30,34 @@ import { Leaderboard } from "@/components/gamification/leaderboard";
 import { AdminDashboard } from "@/components/admin/admin-dashboard";
 import { EventsPortal } from "@/components/events/events-portal";
 import { WelcomePopup } from "@/components/ui/welcome-popup";
-import { getFeed, getTopContributors } from "@/lib/api";
+import { getFeed, getTopContributors, FeedItem } from "@/lib/api";
 import { formatTimestamp } from "@/helper/helper";
 import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
+import { IUser } from '@/models/user';
+import { IArticle } from '@/models/article';
+import { IEvent } from '@/models/event';
+import { IForum } from '@/models/forum';
+import { IAchievement } from '@/models/achievement';
+
+interface IFeedActivity extends FeedItem {
+  title: string;
+  description: string;
+  timestamp: string;
+  author: { name: string; department?: string };
+  engagement: { likes?: number; comments?: number; attendees?: number };
+}
+
+interface ITopContributor {
+  id: string;
+  name: string;
+  avatar?: string;
+  contribution: number;
+  points: number;
+}
 
 interface CommunityDashboardProps {
-  user: any;
+  user: IUser;
   onLogout: () => void;
   children: ReactNode;
 }
@@ -54,17 +75,23 @@ export function CommunityDashboard({
 
   const isAdmin = user.role === "admin";
 
-  const [feedActivities, setFeedActivities] = useState<any[]>([]);
+  const [feedActivities, setFeedActivities] = useState<IFeedActivity[]>([]);
   const [feedPage, setFeedPage] = useState(1);
   const [feedHasMore, setFeedHasMore] = useState(true);
 
-  const [topContributors, setTopContributors] = useState<any[]>([]);
+  const [topContributors, setTopContributors] = useState<ITopContributor[]>([]);
 
   useEffect(() => {
     const fetchTopContributors = async () => {
       try {
         const res = await getTopContributors();
-        setTopContributors(res.data.topContributors);
+        setTopContributors(res.data.topContributors.map(tc => ({
+          id: tc._id,
+          name: tc.name,
+          avatar: tc.avatar,
+          contribution: tc.gamification?.totalMonthlyContributions || 0,
+          points: tc.gamification?.points || 0,
+        })));
       } catch (error) {
         console.error("Error fetching top contributors:", error);
       }
@@ -77,10 +104,12 @@ export function CommunityDashboard({
     (async () => {
       try {
         const res = await getFeed(1, 5);
-        setFeedActivities(res.data.items);
+        setFeedActivities(res.data.items as IFeedActivity[]);
         setFeedPage(1);
         setFeedHasMore(res.data.page < res.data.totalPages);
-      } catch {}
+      } catch (e: unknown) {
+        console.error("Failed to fetch feed activities:", e);
+      }
     })();
   }, []);
 
@@ -111,19 +140,21 @@ export function CommunityDashboard({
     try {
       const nextPage = feedPage + 1;
       const res = await getFeed(nextPage, 5);
-      setFeedActivities((prev) => [...prev, ...res.data.items]);
+      setFeedActivities((prev) => [...prev, ...res.data.items as IFeedActivity[]]);
       setFeedPage(nextPage);
       setFeedHasMore(res.data.page < res.data.totalPages);
-    } catch {}
+    } catch (e: unknown) {
+      console.error("Failed to load more feed activities:", e);
+    }
   };
 
-  const getActivityIcon = (type: string) => {
+  const getActivityIcon = (type: IFeedActivity['type']) => {
     switch (type) {
       case "article":
         return <BookOpen className="w-4 h-4" />;
       case "event":
         return <Calendar className="w-4 h-4" />;
-      case "discussion":
+      case "forum":
         return <MessageSquare className="w-4 h-4" />;
       case "achievement":
         return <Trophy className="w-4 h-4" />;
@@ -132,13 +163,13 @@ export function CommunityDashboard({
     }
   };
 
-  const getActivityColor = (type: string) => {
+  const getActivityColor = (type: IFeedActivity['type']) => {
     switch (type) {
       case "article":
         return "bg-emerald-100 text-emerald-700";
       case "event":
         return "bg-green-100 text-green-700";
-      case "discussion":
+      case "forum":
         return "bg-teal-100 text-teal-700";
       case "achievement":
         return "bg-yellow-100 text-yellow-700";
@@ -271,17 +302,17 @@ export function CommunityDashboard({
                     variant="secondary"
                     className="bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700"
                   >
-                    {user.points}
+                    {user.gamification?.points}
                   </Badge>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Level</span>
-                  <Badge variant="outline">Level {user.level}</Badge>
+                  <Badge variant="outline">Level {user.gamification?.level}</Badge>
                 </div>
                 <div className="space-y-2">
                   <span className="text-sm">Badges</span>
                   <div className="flex flex-wrap gap-1">
-                    {user.badges.map((badge: string, index: number) => (
+                    {user.gamification?.badges.map((badge: string, index: number) => (
                       <Badge
                         key={index}
                         variant="secondary"
@@ -303,7 +334,7 @@ export function CommunityDashboard({
               <CardContent className="space-y-4">
                 {topContributors.length > 0 ? (
                   <div className="space-y-3">
-                    {topContributors.map((contributor) => (
+                    {topContributors.map((contributor: ITopContributor) => (
                       <div key={contributor.id} className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
                           <Avatar className="w-8 h-8">

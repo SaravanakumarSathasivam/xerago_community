@@ -6,12 +6,13 @@ import { getArticle } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { IArticle } from '@/models/article';
 
 export default function KnowledgeDetailPage() {
   const params = useParams();
   const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
   const router = useRouter();
-  const [article, setArticle] = useState<any | null>(null);
+  const [article, setArticle] = useState<IArticle | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,7 +22,7 @@ export default function KnowledgeDetailPage() {
         if (!id) return;
         const res = await getArticle(id);
         setArticle(res.data.article);
-      } catch (e: any) {
+      } catch (e: Error) {
         setError(e?.message || "Failed to load article");
       } finally {
         setLoading(false);

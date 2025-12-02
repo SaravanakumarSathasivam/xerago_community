@@ -1,79 +1,3 @@
-// "use client";
-
-// import React, { useState } from 'react';
-// import { Card, CardContent } from '@/components/ui/card';
-// import { Button } from '@/components/ui/button';
-// import { Users, FileText, Settings, BarChart } from 'lucide-react';
-// import { UserManagement } from './user-management'; // We will create this next
-
-// interface AdminDashboardProps {
-//   currentUser: any;
-// }
-
-// export function AdminDashboard({ currentUser }: AdminDashboardProps) {
-//   const [activeTab, setActiveTab] = useState('users');
-
-//   return (
-//     <div className="space-y-6">
-//       <h1 className="text-3xl font-bold">Admin Panel</h1>
-
-//       <div className="flex flex-col md:flex-row gap-4">
-//         <Card className="md:w-1/4">
-//           <CardContent className="p-4 space-y-2">
-//             <Button
-//               variant={activeTab === 'users' ? 'default' : 'ghost'}
-//               className="w-full justify-start"
-//               onClick={() => setActiveTab('users')}
-//             >
-//               <Users className="mr-2 h-4 w-4" /> User Management
-//             </Button>
-//             <Button
-//               variant={activeTab === 'content' ? 'default' : 'ghost'}
-//               className="w-full justify-start"
-//               onClick={() => setActiveTab('content')}
-//             >
-//               <FileText className="mr-2 h-4 w-4" /> Content Moderation
-//             </Button>
-//             <Button
-//               variant={activeTab === 'settings' ? 'default' : 'ghost'}
-//               className="w-full justify-start"
-//               onClick={() => setActiveTab('settings')}
-//             >
-//               <Settings className="mr-2 h-4 w-4" /> General Settings
-//             </Button>
-//             <Button
-//               variant={activeTab === 'analytics' ? 'default' : 'ghost'}
-//               className="w-full justify-start"
-//               onClick={() => setActiveTab('analytics')}
-//             >
-//               <BarChart className="mr-2 h-4 w-4" /> Analytics
-//             </Button>
-//           </CardContent>
-//         </Card>
-
-//         <div className="md:w-3/4">
-//           {activeTab === 'users' && <UserManagement currentUser={currentUser} />}
-//           {activeTab === 'content' && (
-//             <Card>
-//               <CardContent className="p-6">Content Moderation Section (Coming Soon)</CardContent>
-//             </Card>
-//           )}
-//           {activeTab === 'settings' && (
-//             <Card>
-//               <CardContent className="p-6">General Settings Section (Coming Soon)</CardContent>
-//             </Card>
-//           )}
-//           {activeTab === 'analytics' && (
-//             <Card>
-//               <CardContent className="p-6">Analytics Section (Coming Soon)</CardContent>
-//             </Card>
-//           )}
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -100,6 +24,10 @@ import {
   getPointSettings,
   updatePointSettings,
   updateForumPostApproval,
+  AdminStatsResponse,
+  AdminAnalyticsResponse,
+  DailyActiveUser,
+  TopCategory,
 } from "@/lib/api";
 import { useDropdownOptions } from "@/hooks/use-dropdown-options";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -136,22 +64,36 @@ import {
   XCircle,
   Award,
 } from "lucide-react";
+import { IUser } from "@/models/user";
+import { IReport } from "@/models/report";
+import { IForum } from "@/models/forum";
+import { IArticle } from "@/models/article";
+import { IAchievement } from "@/models/achievement";
+import { IDropdownOption } from "@/models/dropdown-option";
+import { IPointSettings } from "@/models/point-settings";
 
-const adminStats = {
-  totalUsers: 0,
-  activeUsers: 0,
-  totalPosts: 0,
-  totalArticles: 0,
-  pendingReports: 0,
-  newUsersThisWeek: 0,
-  engagementRate: 0,
-  averageSessionTime: "0m",
-};
+interface IAdminUser extends IUser {
+  id: string; // Map _id from IUser to id for convenience
+  joinedAt: string;
+  lastActive: string;
+  status: "active" | "suspended";
+  points: number;
+  postsCount: number;
+  articlesCount: number;
+}
 
-const mockUsers: any[] = [];
+interface IAdminReport extends Omit<IReport, 'reportedBy' | 'targetUser' | 'targetContent'> {
+  id: string;
+  reportedBy: string;
+  targetUser: string;
+  targetContent: string;
+}
 
-const mockReports = [
+const mockUsers: IAdminUser[] = [];
+
+const mockReports: IAdminReport[] = [
   {
+    _id: "1",
     id: "1",
     type: "inappropriate_content",
     reportedBy: "John Doe",
@@ -159,10 +101,12 @@ const mockReports = [
     targetContent: "Inappropriate comment in Marketing discussion",
     reason: "Offensive language and unprofessional behavior",
     status: "pending",
-    createdAt: "2024-01-14T16:30:00Z",
     priority: "medium",
+    createdAt: "2024-01-14T16:30:00Z",
+    updatedAt: "2024-01-14T16:30:00Z",
   },
   {
+    _id: "2",
     id: "2",
     type: "spam",
     reportedBy: "Jane Wilson",
@@ -170,10 +114,12 @@ const mockReports = [
     targetContent: "Repeated promotional posts in multiple forums",
     reason: "Posting promotional content repeatedly",
     status: "pending",
-    createdAt: "2024-01-13T11:20:00Z",
     priority: "low",
+    createdAt: "2024-01-13T11:20:00Z",
+    updatedAt: "2024-01-13T11:20:00Z",
   },
   {
+    _id: "3",
     id: "3",
     type: "harassment",
     reportedBy: "Lisa Wang",
@@ -181,92 +127,60 @@ const mockReports = [
     targetContent: "Personal attacks in AI discussion thread",
     reason: "Targeted harassment and personal attacks",
     status: "pending",
-    createdAt: "2024-01-12T14:45:00Z",
     priority: "high",
+    createdAt: "2024-01-12T14:45:00Z",
+    updatedAt: "2024-01-12T14:45:00Z",
   },
 ];
 
-const mockAnalytics = {
+const mockAnalytics: AdminAnalyticsResponse['data'] = {
   dailyActiveUsers: [
-    { date: "2024-01-08", users: 45 },
-    { date: "2024-01-09", users: 52 },
-    { date: "2024-01-10", users: 48 },
-    { date: "2024-01-11", users: 61 },
-    { date: "2024-01-12", users: 58 },
-    { date: "2024-01-13", users: 67 },
-    { date: "2024-01-14", users: 73 },
-    { date: "2024-01-15", users: 89 },
+    { date: "2024-01-08", count: 45 },
+    { date: "2024-01-09", count: 52 },
+    { date: "2024-01-10", count: 48 },
+    { date: "2024-01-11", count: 61 },
+    { date: "2024-01-12", count: 58 },
+    { date: "2024-01-13", count: 67 },
+    { date: "2024-01-14", count: 73 },
+    { date: "2024-01-15", count: 89 },
   ],
   topCategories: [
-    { name: "AI & Innovation", posts: 156, engagement: 85 },
-    { name: "Marketing", posts: 134, engagement: 78 },
-    { name: "Technology", posts: 98, engagement: 72 },
-    { name: "Analytics", posts: 87, engagement: 81 },
+    { name: "AI & Innovation", count: 156, engagement: 85 },
+    { name: "Marketing", count: 134, engagement: 78 },
+    { name: "Technology", count: 98, engagement: 72 },
+    { name: "Analytics", count: 87, engagement: 81 },
   ],
+  engagementRate: 75,
+  averageSessionTime: "00:05:30",
+  contentGrowth: 10,
 };
 
 interface AdminDashboardProps {
-  currentUser: any;
-}
-
-interface AnalyticsRes {
-  engagementRate: number;
-  averageSessionTime: string;
-  dailyActiveUsers: any[];
-  contentGrowth: number;
-  topCategories: any[];
-}
-
-interface User {
-  id: string;
-  name: any;
-  department: string;
-  avatar: string;
-  points: number;
-  level: number;
-  badges: string[];
-  weeklyPoints: number;
-  monthlyPoints: number;
-  postsCount: number;
-  helpfulAnswers: number;
-  streak: number;
-  rank: number;
-  isActive: boolean;
-}
-
-interface AdminStats {
-  totalUsers: number;
-  activeUsers: number;
-  totalPosts: number;
-  totalArticles: number;
-  pendingReports: number;
-  newUsersThisWeek: number;
-  engagementRate: number;
-  averageSessionTime: string;
+  currentUser: IUser;
 }
 
 export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState("overview");
-  const [users, setUsers] = useState<any[]>([]);
-  const [userSearch, setUserSearch] = useState("");
-  const [userStatusFilter, setUserStatusFilter] = useState("all");
-  const [reports, setReports] = useState(mockReports);
-  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [users, setUsers] = useState<IAdminUser[]>([]);
+  const [userSearch, setUserSearch] = useState<string>("all");
+  const [userStatusFilter, setUserStatusFilter] = useState<string>("all");
+  const [reports, setReports] = useState<IAdminReport[]>(mockReports);
+  const [selectedUser, setSelectedUser] = useState<IAdminUser | null>(null);
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
-  const [analyticsRes, setAnalyticsRes] = useState<AnalyticsRes | undefined>();
-  const [adminStats, setAdminStats] = useState<AdminStats | undefined>();
+  const [analyticsRes, setAnalyticsRes] = useState<AdminAnalyticsResponse['data'] | undefined>();
+  const [adminStats, setAdminStats] = useState<AdminStatsResponse['data']['stats'] | undefined>();
   const [forumModalOpen, setForumModalOpen] = useState(false);
-  const [forumList, setForumList] = useState<any[]>([]);
+  const [forumList, setForumList] = useState<IForum[]>([]);
   const [articleModalOpen, setArticleModalOpen] = useState(false);
-  const [articleList, setArticleList] = useState<any[]>([]);
+  const [articleList, setArticleList] = useState<IArticle[]>([]);
   const [achievementsModalOpen, setAchievementsModalOpen] = useState(false);
-  const [achievements, setAchievements] = useState<any[]>([]);
+  const [achievements, setAchievements] = useState<IAchievement[]>([]);
   const [flagModalOpen, setFlagModalOpen] = useState(false);
-  const [flaggedReports, setFlaggedReports] = useState<any[]>([]);
+  const [flaggedReports, setFlaggedReports] = useState<IReport[]>([]);
   const [categoriesModalOpen, setCategoriesModalOpen] = useState(false);
-  const [articleCategories, setArticleCategories] = useState<any[]>([]);
+  const [articleCategories, setArticleCategories] = useState<IDropdownOption[]>([]);
   const [pointsModalOpen, setPointsModalOpen] = useState(false);
-  const [pointSettings, setPointSettings] = useState<any | null>(null);
+  const [pointSettings, setPointSettings] = useState<IPointSettings['value'] | null>(null);
 
   // Fetch dropdown options from API
   const { options: userStatusOptions, loading: userStatusLoading } =
@@ -308,23 +222,18 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       try {
         const statsRes = await getAdminStats();
         setAdminStats(statsRes.data.stats);
-        // You can render statsRes.data.stats directly where needed
 
         const usersRes = await getAdminUsers({ page: 1, limit: 20 });
         setUsers(
-          usersRes.data.users.map((u: any) => ({
+          usersRes.data.users.map((u: IUser) => ({
+            ...u, // Spread existing IUser properties
             id: u._id,
-            name: u.name,
-            email: u.email,
-            department: u.department,
-            avatar: u.avatar,
-            joinedAt: u.createdAt,
-            lastActive: u.updatedAt,
+            joinedAt: u.createdAt || new Date().toISOString(),
+            lastActive: u.updatedAt || new Date().toISOString(),
             status: u.isActive ? "active" : "suspended",
             points: u.gamification?.points || 0,
-            postsCount: 0,
-            articlesCount: 0,
-            role: u.role || "user",
+            postsCount: 0, 
+            articlesCount: 0, 
           }))
         );
 
@@ -334,23 +243,26 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           limit: 10,
         });
         setReports(
-          reportsRes.data.reports.map((r: any) => ({
-            id: r._id,
+          reportsRes.data.reports.map((r: IReport) => ({
+            _id: r._id, 
+            id: r._id, 
             type: r.type,
-            reportedBy: r.reportedBy?.name || "Unknown",
-            targetUser: r.targetUser?.name || "-",
+            reportedBy: (r.reportedBy as unknown as IUser)?.name || (r.reportedBy as string) || "Unknown",
+            targetUser: (r.targetUser as unknown as IUser)?.name || (r.targetUser as string) || "-",
             targetContent: r.targetContent?.model || "-",
             reason: r.reason,
             status: r.status,
-            createdAt: r.createdAt,
             priority: r.priority,
+            createdAt: r.createdAt || new Date().toISOString(),
+            updatedAt: r.updatedAt || new Date().toISOString(),
           }))
         );
 
         const analyticsRes = await getAdminAnalytics();
         setAnalyticsRes(analyticsRes.data);
-        // analyticsRes.data.topCategories and .dailyActiveUsers can replace mockAnalytics
-      } catch {}
+      } catch (e: unknown) {
+        console.error("Failed to fetch admin data:", e instanceof Error ? e.message : "An unknown error occurred");
+      }
     })();
   }, []);
 
@@ -359,7 +271,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     action: "approve" | "reject"
   ) => {
     setReports(
-      reports.map((report) =>
+      reports.map((report: IAdminReport) =>
         report.id === reportId
           ? {
               ...report,
@@ -379,39 +291,37 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       if (action === "suspend" || action === "activate") {
         await updateAdminUserStatus(userId, action === "activate");
         setUsers(
-          users.map((u) =>
+          users.map((u: IAdminUser) =>
             u.id === userId
               ? { ...u, status: action === "activate" ? "active" : "suspended" }
               : u
           )
         );
         setSelectedUser(
-          users.find((u) =>
-            u.id === userId
-              ? { ...u, status: action === "activate" ? "active" : "suspended" }
-              : u
-          )
+          users.find((u: IAdminUser) => u.id === userId) || null
         );
         setIsUserDialogOpen(false);
       } else if (action === "promote" || action === "demote") {
-        const nextRole =
+        const nextRole: 'user' | 'moderator' | 'admin' =
           action === "promote"
-            ? users.find((u) => u.id === userId)?.role === "user"
+            ? users.find((u: IAdminUser) => u.id === userId)?.role === "user"
               ? "moderator"
               : "admin"
-            : users.find((u) => u.id === userId)?.role === "admin"
+            : users.find((u: IAdminUser) => u.id === userId)?.role === "admin"
             ? "moderator"
             : "user";
         await updateAdminUserRole(userId, nextRole!);
         setUsers(
-          users.map((u) => (u.id === userId ? { ...u, role: nextRole } : u))
+          users.map((u: IAdminUser) => (u.id === userId ? { ...u, role: nextRole } : u))
         );
         setIsUserDialogOpen(false);
       }
-    } catch {}
+    } catch (e: unknown) {
+        console.error("Failed to perform user action:", e instanceof Error ? e.message : "An unknown error occurred");
+    }
   };
 
-  const filteredUsers = users.filter((user) => {
+  const filteredUsers = users.filter((user: IAdminUser) => {
     const matchesStatus =
       userStatusFilter === "all" ? true : user.status === userStatusFilter;
     const normalizedSearch = userSearch.trim().toLowerCase();
@@ -504,10 +414,10 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {adminStats?.totalPosts}
+                  {adminStats?.totalForumPosts}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {adminStats?.totalArticles} knowledge articles
+                  {adminStats?.publishedArticles} knowledge articles
                 </p>
               </CardContent>
             </Card>
@@ -538,7 +448,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {users.slice(0, 5).map((user) => (
+                  {users.slice(0, 5).map((user: IAdminUser) => (
                     <div key={user.id} className="flex items-center space-x-3">
                       <Avatar className="w-8 h-8">
                         <AvatarImage
@@ -548,7 +458,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         <AvatarFallback className="text-xs">
                           {user.name
                             .split(" ")
-                            .map((n: any[]) => n[0])
+                            .map((n: string) => n[0])
                             .join("")}
                         </AvatarFallback>
                       </Avatar>
@@ -580,7 +490,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {analyticsRes?.topCategories.map((category, index) => (
+                  {analyticsRes?.topCategories.map((category: TopCategory, index: number) => (
                     <div
                       key={index}
                       className="flex items-center justify-between"
@@ -588,7 +498,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                       <div>
                         <p className="text-sm font-medium">{category.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {category.posts} posts
+                          {category.count} posts
                         </p>
                       </div>
                       <div className="text-right">
@@ -625,7 +535,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All statuses</SelectItem>
-                  {userStatusOptions.map((option) => (
+                  {userStatusOptions.map((option: IDropdownOption) => (
                     <SelectItem key={option._id} value={option.value}>
                       {option.label}
                     </SelectItem>
@@ -646,7 +556,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     No users found for the selected filters.
                   </div>
                 )}
-                {filteredUsers.map((user) => (
+                {filteredUsers.map((user: IAdminUser) => (
                   <div
                     key={user.id}
                     className="flex items-center justify-between p-4 border rounded-lg"
@@ -660,7 +570,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         <AvatarFallback>
                           {user.name
                             .split(" ")
-                            .map((n: any[]) => n[0])
+                            .map((n: string) => n[0])
                             .join("")}
                         </AvatarFallback>
                       </Avatar>
@@ -694,7 +604,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {user.department} • Joined{" "}
-                          {new Date(user.joinedAt).toLocaleDateString()}
+                          {new Date(user.createdAt).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
@@ -759,7 +669,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {adminStats?.totalPosts}
+                  {adminStats?.totalForumPosts}
                 </div>
                 <p className="text-sm text-muted-foreground">
                   Total discussions
@@ -810,7 +720,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {adminStats?.totalArticles}
+                  {adminStats?.publishedArticles}
                 </div>
                 <p className="text-sm text-muted-foreground">
                   Published articles
@@ -894,14 +804,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <DialogTitle>Moderate Forum Posts</DialogTitle>
               </DialogHeader>
               <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-                {forumList.map((p) => (
+                {forumList.map((p: IForum) => (
                   <div key={p._id} className="p-3 border rounded">
                     <div className="flex items-center justify-between mb-2">
                       <div>
                         <div className="font-medium">{p.title}</div>
                         <div className="text-xs text-muted-foreground">
-                          {p.author?.name} •{" "}
-                          {new Date(p.createdAt).toLocaleString()}
+                          {((p.author as IUser)?.name || p.author) as string} •{" "}
+                          {new Date(p.createdAt!).toLocaleString()}
                         </div>
                       </div>
                       <Badge
@@ -927,7 +837,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                           onClick={async () => {
                             await updateForumPostApproval(p._id, "approved");
                             setForumList(
-                              forumList.map((x) =>
+                              forumList.map((x: IForum) =>
                                 x._id === p._id
                                   ? { ...x, approvalStatus: "approved" }
                                   : x
@@ -946,7 +856,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                           onClick={async () => {
                             await updateForumPostApproval(p._id, "rejected");
                             setForumList(
-                              forumList.map((x) =>
+                              forumList.map((x: IForum) =>
                                 x._id === p._id
                                   ? { ...x, approvalStatus: "rejected" }
                                   : x
@@ -969,7 +879,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                           ) {
                             await adminDeleteForumPost(p._id);
                             setForumList(
-                              forumList.filter((x) => x._id !== p._id)
+                              forumList.filter((x: IForum) => x._id !== p._id)
                             );
                           }
                         }}
@@ -991,12 +901,12 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <DialogTitle>Review Articles</DialogTitle>
               </DialogHeader>
               <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-                {articleList.map((a) => (
+                {articleList.map((a: IArticle) => (
                   <div key={a._id} className="p-3 border rounded">
                     <div className="flex items-center justify-between">
                       <div className="font-medium">{a.title}</div>
                       <div className="text-xs text-muted-foreground">
-                        {a.author?.name}
+                        {typeof a.author === 'object' && a.author !== null ? a.author.name : a.author}
                       </div>
                     </div>
                     <div className="text-sm text-muted-foreground line-clamp-2">
@@ -1035,14 +945,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <DialogTitle>Flagged Content</DialogTitle>
               </DialogHeader>
               <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-                {flaggedReports.map((r) => (
+                {flaggedReports.map((r: IReport) => (
                   <div key={r._id} className="p-3 border rounded">
                     <div className="flex items-center justify-between">
                       <div className="font-medium">
                         {r.type?.replace("_", " ")}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {new Date(r.createdAt).toLocaleString()}
+                        {new Date(r.createdAt!).toLocaleString()}
                       </div>
                     </div>
                     <div className="text-sm text-muted-foreground">
@@ -1053,9 +963,9 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         variant="outline"
                         size="sm"
                         onClick={async () => {
-                          await adminUpdateReportStatus(r._id, "dismissed");
+                          await adminUpdateReportStatus(r._id!, "dismissed");
                           setFlaggedReports(
-                            flaggedReports.filter((x) => x._id !== r._id)
+                            flaggedReports.filter((x: IReport) => x._id !== r._id)
                           );
                         }}
                       >
@@ -1065,9 +975,9 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         variant="default"
                         size="sm"
                         onClick={async () => {
-                          await adminUpdateReportStatus(r._id, "resolved");
+                          await adminUpdateReportStatus(r._id!, "resolved");
                           setFlaggedReports(
-                            flaggedReports.filter((x) => x._id !== r._id)
+                            flaggedReports.filter((x: IReport) => x._id !== r._id)
                           );
                         }}
                       >
@@ -1090,7 +1000,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <DialogTitle>Manage Article Categories</DialogTitle>
               </DialogHeader>
               <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-                {articleCategories.map((c) => (
+                {articleCategories.map((c: IDropdownOption) => (
                   <div
                     key={c._id}
                     className="p-3 border rounded flex items-center justify-between"
@@ -1113,7 +1023,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                             { label: nextLabel }
                           );
                           setArticleCategories(
-                            articleCategories.map((x) =>
+                            articleCategories.map((x: IDropdownOption) =>
                               x._id === c._id ? updated.data : x
                             )
                           );
@@ -1127,7 +1037,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         onClick={async () => {
                           await adminDeleteDropdownOption(c._id);
                           setArticleCategories(
-                            articleCategories.filter((x) => x._id !== c._id)
+                            articleCategories.filter((x: IDropdownOption) => x._id !== c._id)
                           );
                         }}
                       >
@@ -1170,13 +1080,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               </DialogHeader>
               {pointSettings && (
                 <div className="space-y-3">
-                  {Object.entries(pointSettings).map(([k, v]) => (
+                  {Object.entries(pointSettings).map(([k, v]: [string, number]) => (
                     <div key={k} className="flex items-center justify-between">
                       <div className="text-sm font-medium">{k}</div>
                       <Input
                         className="w-24"
                         type="number"
-                        value={v as any}
+                        value={v}
                         onChange={(e) =>
                           setPointSettings({
                             ...pointSettings,
@@ -1213,7 +1123,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <DialogTitle>Manage Achievements</DialogTitle>
               </DialogHeader>
               <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-                {achievements.map((ac) => (
+                {achievements.map((ac: IAchievement) => (
                   <div key={ac._id} className="p-3 border rounded">
                     <div className="flex items-center justify-between">
                       <div className="font-medium">{ac.name}</div>
@@ -1228,6 +1138,19 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         onClick={async () => {
                           const updated = await adminUpdateAchievement(ac._id, {
                             name: ac.name,
+                            description: ac.description,
+                            category: ac.category,
+                            type: ac.type,
+                            icon: ac.icon,
+                            color: ac.color,
+                            rarity: ac.rarity,
+                            points: ac.points,
+                            criteria: ac.criteria,
+                            isActive: ac.isActive,
+                            isHidden: ac.isHidden,
+                            prerequisites: ac.prerequisites,
+                            rewards: ac.rewards,
+                            metadata: ac.metadata
                           });
                         }}
                       >
@@ -1239,7 +1162,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         onClick={async () => {
                           await adminDeleteAchievement(ac._id);
                           setAchievements(
-                            achievements.filter((x) => x._id !== ac._id)
+                            achievements.filter((x: IAchievement) => x._id !== ac._id)
                           );
                         }}
                       >
@@ -1290,8 +1213,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             <CardContent>
               <div className="space-y-4">
                 {reports
-                  .filter((report) => report.status === "pending")
-                  .map((report) => (
+                  .filter((report: IAdminReport) => report.status === "pending")
+                  .map((report: IAdminReport) => (
                     <div
                       key={report.id}
                       className="p-4 border rounded-lg space-y-3"
@@ -1349,7 +1272,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                       </div>
                     </div>
                   ))}
-                {reports.filter((report) => report.status === "pending")
+                {reports.filter((report: IAdminReport) => report.status === "pending")
                   .length === 0 && (
                   <div className="text-center py-8">
                     <CheckCircle className="w-12 h-12 mx-auto text-green-500 mb-2" />
@@ -1403,9 +1326,9 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {analyticsRes?.dailyActiveUsers?.[
+                  {analyticsRes?.dailyActiveUsers[
                     analyticsRes.dailyActiveUsers.length - 1
-                  ]?.users ?? 0}
+                  ]?.count ?? 0}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Today's activity
@@ -1440,7 +1363,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 {analyticsRes?.dailyActiveUsers &&
                 analyticsRes.dailyActiveUsers.length > 0 ? (
                   <div className="space-y-2">
-                    {analyticsRes.dailyActiveUsers.map((day: any) => (
+                    {analyticsRes.dailyActiveUsers.map((day: DailyActiveUser) => (
                       <div
                         key={day.date}
                         className="flex items-center justify-between"
@@ -1453,17 +1376,17 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="text-sm text-muted-foreground">
-                            {day.users} users
+                            {day.count} users
                           </div>
                           <div className="w-48 bg-gray-200 rounded-full h-2">
                             <div
                               className="bg-blue-600 h-2 rounded-full"
                               style={{
                                 width: `${Math.min(
-                                  (day.users /
+                                  (day.count /
                                     (Math.max(
                                       ...analyticsRes.dailyActiveUsers.map(
-                                        (d: any) => d.users
+                                        (d: DailyActiveUser) => d.count
                                       )
                                     ) || 1)) *
                                     100,
@@ -1488,114 +1411,114 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             </CardContent>
           </Card>
         </TabsContent>
-      </Tabs>
 
-      {/* User Detail Dialog */}
-      <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>User Details</DialogTitle>
-          </DialogHeader>
-          {selectedUser && (
-            <div className="space-y-6">
-              <div className="flex items-center space-x-4">
-                <Avatar className="w-16 h-16">
-                  <AvatarImage
-                    src={selectedUser.avatar || "/placeholder.svg"}
-                    alt={selectedUser.name}
-                  />
-                  <AvatarFallback>
-                    {selectedUser.name
-                      .split(" ")
-                      .map((n: string) => n[0])
-                      .join("")}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h3 className="text-xl font-semibold">{selectedUser.name}</h3>
-                  <p className="text-muted-foreground">{selectedUser.email}</p>
-                  <div className="flex gap-2 mt-2">
-                    <Badge
-                      variant={
-                        selectedUser.role === "admin"
-                          ? "default"
-                          : selectedUser.role === "moderator"
-                          ? "secondary"
-                          : "outline"
-                      }
-                    >
-                      {selectedUser.role}
-                    </Badge>
-                    <Badge
-                      variant={
-                        selectedUser.status === "active"
-                          ? "default"
-                          : "destructive"
-                      }
-                    >
-                      {selectedUser.status}
-                    </Badge>
+        {/* User Detail Dialog */}
+        <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>User Details</DialogTitle>
+            </DialogHeader>
+            {selectedUser && (
+              <div className="space-y-6">
+                <div className="flex items-center space-x-4">
+                  <Avatar className="w-16 h-16">
+                    <AvatarImage
+                      src={selectedUser.avatar || "/placeholder.svg"}
+                      alt={selectedUser.name}
+                    />
+                    <AvatarFallback>
+                      {selectedUser.name
+                        .split(" ")
+                        .map((n: string) => n[0])
+                        .join("")}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h3 className="text-xl font-semibold">{selectedUser.name}</h3>
+                    <p className="text-muted-foreground">{selectedUser.email}</p>
+                    <div className="flex gap-2 mt-2">
+                      <Badge
+                        variant={
+                          selectedUser.role === "admin"
+                            ? "default"
+                            : selectedUser.role === "moderator"
+                            ? "secondary"
+                            : "outline"
+                        }
+                      >
+                        {selectedUser.role}
+                      </Badge>
+                      <Badge
+                        variant={
+                          selectedUser.status === "active"
+                            ? "default"
+                            : "destructive"
+                        }
+                      >
+                        {selectedUser.status}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium">Department</p>
-                  <p className="text-muted-foreground">
-                    {selectedUser.department}
-                  </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium">Department</p>
+                    <p className="text-muted-foreground">
+                      {selectedUser.department}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Joined</p>
+                    <p className="text-muted-foreground">
+                      {new Date(selectedUser.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Points</p>
+                    <p className="text-muted-foreground">{selectedUser.points}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Last Active</p>
+                    <p className="text-muted-foreground">
+                      {formatTimeAgo(selectedUser.lastActive)}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium">Joined</p>
-                  <p className="text-muted-foreground">
-                    {new Date(selectedUser.joinedAt).toLocaleDateString()}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Points</p>
-                  <p className="text-muted-foreground">{selectedUser.points}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Last Active</p>
-                  <p className="text-muted-foreground">
-                    {formatTimeAgo(selectedUser.lastActive)}
-                  </p>
-                </div>
-              </div>
 
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    handleUserAction(
-                      selectedUser.id,
-                      selectedUser.role === "user" ? "promote" : "demote"
-                    )
-                  }
-                >
-                  {selectedUser.role === "user"
-                    ? "Promote to Moderator"
-                    : "Demote"}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    handleUserAction(
-                      selectedUser.id,
-                      selectedUser.status === "active" ? "suspend" : "activate"
-                    )
-                  }
-                >
-                  {selectedUser.status === "active"
-                    ? "Suspend User"
-                    : "Activate User"}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      handleUserAction(
+                        selectedUser.id,
+                        selectedUser.role === "user" ? "promote" : "demote"
+                      )
+                    }
+                  >
+                    {selectedUser.role === "user"
+                      ? "Promote to Moderator"
+                      : "Demote"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      handleUserAction(
+                        selectedUser.id,
+                        selectedUser.status === "active" ? "suspend" : "activate"
+                      )
+                    }
+                  >
+                    {selectedUser.status === "active"
+                      ? "Suspend User"
+                      : "Activate User"}
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+            )}
+          </DialogContent>
+        </Dialog>
+      </Tabs>
     </div>
   );
 }

@@ -9,14 +9,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { IUser } from '@/models/user';
 
 const departments = ["Digital Analytics", "Marketing", "CMS", "AI Engineering", "Product Management", "Design", "Sales"]
 
 interface LoginFormProps {
-  onLogin: (user: any) => void
+  onLogin: (user: IUser) => void
 }
-
-const mockUsers: any[] = []
 
 export function LoginForm({ onLogin }: LoginFormProps) {
   const [email, setEmail] = useState("")
@@ -46,8 +45,8 @@ export function LoginForm({ onLogin }: LoginFormProps) {
       setMode("login")
       setPassword("")
       setError("")
-    } catch (err: any) {
-      setError(err?.message || "Registration failed")
+    } catch (err: unknown) {
+      setError((err as Error)?.message || "Registration failed")
     } finally {
       setLoading(false)
     }
@@ -61,22 +60,15 @@ export function LoginForm({ onLogin }: LoginFormProps) {
     setError("")
     try {
       const res = await apiLogin({ email, password })
-      const { user, token, refreshToken } = res.data
+      const { user, token, refreshToken }: { user: IUser; token: string; refreshToken: string } = res.data
       localStorage.setItem("xerago-token", JSON.stringify(token))
       localStorage.setItem("xerago-refresh", JSON.stringify(refreshToken))
       onLogin({
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        department: user.department,
-        avatar: user.avatar,
-        points: user.gamification?.points ?? 0,
-        level: user.gamification?.level ?? 1,
-        badges: user.gamification?.badges ?? [],
-        role: user.role,
+        ...user,
+        id: user._id,
       })
-    } catch (err: any) {
-      const message = err?.message || "Invalid email or password"
+    } catch (err: unknown) {
+      const message = (err as Error)?.message || "Invalid email or password"
       setError(message)
       if (/Email not verified/i.test(message)) {
         setOtpMode(true)
@@ -95,8 +87,8 @@ export function LoginForm({ onLogin }: LoginFormProps) {
       await verifyOtp({ email, code: otp })
       setOtpMode(false)
       alert("Email verified. Please sign in.")
-    } catch (err: any) {
-      setError(err?.message || "OTP verification failed")
+    } catch (err: unknown) {
+      setError((err as Error)?.message || "OTP verification failed")
     } finally {
       setLoading(false)
     }
@@ -108,8 +100,8 @@ export function LoginForm({ onLogin }: LoginFormProps) {
     try {
       await resendOtp({ email })
       alert("OTP sent to your email")
-    } catch (err: any) {
-      setError(err?.message || "Failed to resend OTP")
+    } catch (err: unknown) {
+      setError((err as Error)?.message || "Failed to resend OTP")
     } finally {
       setLoading(false)
     }

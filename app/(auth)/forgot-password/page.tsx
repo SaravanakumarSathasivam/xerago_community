@@ -19,8 +19,8 @@ export default function ForgotPasswordPage() {
     try {
       await forgotPassword({ email })
       setMessage("Reset link sent. Please check your email.")
-    } catch (err: any) {
-      setError(err?.message || "Failed to send reset link")
+    } catch (err: unknown) {
+      setError((err as Error)?.message || "Failed to send reset link")
     } finally {
       setLoading(false)
     }

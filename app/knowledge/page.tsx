@@ -5,10 +5,11 @@ import { BackToTop } from "@/components/ui/back-to-top";
 import { CommunityDashboard } from "@/components/dashboard/community-dashboard";
 import { LoginForm } from "@/components/auth/login-form";
 import { LogoLoader } from "@/components/ui/logo-loader";
+import { IUser } from "@/models/user";
 
 export default function Knowledge() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<IUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,7 +20,7 @@ export default function Knowledge() {
     setLoading(false);
   }, []);
 
-  const handleLogin = (userData: any) => {
+  const handleLogin = (userData: IUser) => {
     setUser(userData);
     localStorage.setItem("xerago-user", JSON.stringify(userData));
   };

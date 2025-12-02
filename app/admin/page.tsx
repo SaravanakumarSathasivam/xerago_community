@@ -6,11 +6,12 @@ import { BackToTop } from "@/components/ui/back-to-top";
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
 import { AdminDashboard } from "@/components/admin/admin-dashboard"; // Import the new AdminDashboard
+import { IUser } from "@/models/user";
 
 export default function AdminPage() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<IUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,7 +33,7 @@ export default function AdminPage() {
     return <div>Loading...</div>;
   }
 
-  if (!user || user.role !== "admin" && user.role !== "super_admin") {
+  if (!user || user.role !== "admin" && user.role !== "superadmin") {
     router.push("/");
     Swal.fire({
       icon: "error",

@@ -6,11 +6,12 @@ import { getForumPost } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { IForum } from '@/models/forum';
 
 export default function ForumDetailPage() {
   const params = useParams();
   const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
-  const [post, setPost] = useState<any | null>(null);
+  const [post, setPost] = useState<IForum | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,7 +21,7 @@ export default function ForumDetailPage() {
         if (!id) return;
         const res = await getForumPost(id);
         setPost(res.data.post);
-      } catch (e: any) {
+      } catch (e: Error) {
         setError(e?.message || "Failed to load post");
       } finally {
         setLoading(false);

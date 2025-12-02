@@ -1,23 +1,9 @@
 import { useState, useEffect } from 'react';
 import { getDropdownOptions, getBatchDropdownOptions } from '@/lib/api';
-
-interface DropdownOption {
-  _id: string;
-  category: string;
-  value: string;
-  label: string;
-  description?: string;
-  order: number;
-  isActive: boolean;
-  metadata?: {
-    color?: string;
-    icon?: string;
-    parentCategory?: string;
-  };
-}
+import { IDropdownOption } from '@/models/dropdown-option';
 
 interface UseDropdownOptionsReturn {
-  options: DropdownOption[];
+  options: IDropdownOption[];
   loading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
@@ -27,7 +13,7 @@ interface UseDropdownOptionsReturn {
  * Custom hook to fetch dropdown options for a specific category
  */
 export function useDropdownOptions(category: string): UseDropdownOptionsReturn {
-  const [options, setOptions] = useState<DropdownOption[]>([]);
+  const [options, setOptions] = useState<IDropdownOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,7 +49,7 @@ export function useDropdownOptions(category: string): UseDropdownOptionsReturn {
 }
 
 interface UseBatchDropdownOptionsReturn {
-  data: Record<string, DropdownOption[]>;
+  data: Record<string, IDropdownOption[]>;
   loading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
@@ -73,7 +59,7 @@ interface UseBatchDropdownOptionsReturn {
  * Custom hook to fetch multiple dropdown categories at once
  */
 export function useBatchDropdownOptions(categories: string[]): UseBatchDropdownOptionsReturn {
-  const [data, setData] = useState<Record<string, DropdownOption[]>>({});
+  const [data, setData] = useState<Record<string, IDropdownOption[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -111,7 +97,7 @@ export function useBatchDropdownOptions(categories: string[]): UseBatchDropdownO
 /**
  * Utility function to create a mapping of value to label for dropdown options
  */
-export function createOptionMap(options: DropdownOption[]): Record<string, string> {
+export function createOptionMap(options: IDropdownOption[]): Record<string, string> {
   return options.reduce((acc, option) => {
     acc[option.value] = option.label;
     return acc;
@@ -121,7 +107,7 @@ export function createOptionMap(options: DropdownOption[]): Record<string, strin
 /**
  * Utility function to get option label by value
  */
-export function getOptionLabel(options: DropdownOption[], value: string): string {
+export function getOptionLabel(options: IDropdownOption[], value: string): string {
   const option = options.find(opt => opt.value === value);
   return option ? option.label : value;
 }
@@ -129,6 +115,6 @@ export function getOptionLabel(options: DropdownOption[], value: string): string
 /**
  * Utility function to get option by value
  */
-export function getOptionByValue(options: DropdownOption[], value: string): DropdownOption | undefined {
+export function getOptionByValue(options: IDropdownOption[], value: string): IDropdownOption | undefined {
   return options.find(opt => opt.value === value);
 }
