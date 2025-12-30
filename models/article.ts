@@ -26,11 +26,13 @@ export interface IArticle extends IDocument {
   status: 'draft' | 'published' | 'archived';
   featured: boolean;
   views: number;
-  likes: string[];
-  bookmarks: string[];
+  likes: number;
+  bookmarks: number;
   comments: IComment[];
   readingTime: number;
   isEdited: boolean;
+  isLiked: boolean;
+  isBookmarked: boolean;
   editedAt?: Date;
   publishedAt?: Date;
   attachments?: IAttachment[];

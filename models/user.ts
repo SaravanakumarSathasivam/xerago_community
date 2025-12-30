@@ -5,9 +5,10 @@ export interface IDocument {
 }
 
 export interface IUser extends IDocument {
+  id: string;
   email: string;
   name: string;
-  role: 'user' | 'moderator' | 'admin' | 'superadmin';
+  role: 'user' | 'moderator' | 'admin' | 'super_admin';
   department?: string;
   avatar?: string;
   bio?: string;

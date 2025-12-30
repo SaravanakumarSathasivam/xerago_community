@@ -60,9 +60,9 @@ import {
 import Swal from "sweetalert2";
 import { useDropdownOptions } from "@/hooks/use-dropdown-options";
 import { SectionLoader } from "@/components/ui/section-loader";
-import { IUser } from '@/models/user';
-import { IArticle, IAttachment } from '@/models/article';
-import { IDropdownOption } from '@/models/dropdown-option';
+import { IUser } from "@/models/user";
+import { IArticle, IAttachment } from "@/models/article";
+import { IDropdownOption } from "@/models/dropdown-option";
 
 const MAX_FILE_SIZE_MB_KNOWLEDGE = 5;
 const MAX_FILE_SIZE_BYTES_KNOWLEDGE = MAX_FILE_SIZE_MB_KNOWLEDGE * 1024 * 1024;
@@ -105,14 +105,18 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
     tags: "",
     difficulty: "Beginner",
   });
-  const [newArticleErrors, setNewArticleErrors] = useState<Record<string, string>>({});
+  const [newArticleErrors, setNewArticleErrors] = useState<
+    Record<string, string>
+  >({});
   const [shareOpen, setShareOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<IEditableArticle | null>(null);
-  const [editArticleErrors, setEditArticleErrors] = useState<Record<string, string>>({});
+  const [editArticleErrors, setEditArticleErrors] = useState<
+    Record<string, string>
+  >({});
 
   const isAdmin = user.role === "admin";
 
@@ -140,18 +144,22 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
     return matchesCategory && matchesSearch;
   });
 
-  const sortedArticles = [...filteredArticles].sort((a: IArticle, b: IArticle) => {
-    if (sortBy === "recent") {
-      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-    } else if (sortBy === "popular") {
-      return (b.views || 0) - (a.views || 0);
-    } else if (sortBy === "likes") {
-      return (b.likes || []).length - (a.likes || []).length;
-    } else if (sortBy === "bookmarks") {
-      return (b.bookmarks || []).length - (a.bookmarks || []).length;
+  const sortedArticles = [...filteredArticles].sort(
+    (a: IArticle, b: IArticle) => {
+      if (sortBy === "recent") {
+        return (
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
+      } else if (sortBy === "popular") {
+        return (b.views || 0) - (a.views || 0);
+      } else if (sortBy === "likes") {
+        return b.likes - a.likes;
+      } else if (sortBy === "bookmarks") {
+        return b.bookmarks - a.bookmarks;
+      }
+      return 0;
     }
-    return 0;
-  });
+  );
 
   const handleLike = async (articleId: string) => {
     try {
@@ -195,7 +203,14 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
       form.append("content", newArticle.content);
       form.append("category", newArticle.category);
       form.append("type", newArticle.type);
-      form.append("tags", newArticle.tags.split(",").map(tag => tag.trim()).filter(Boolean).join(","));
+      form.append(
+        "tags",
+        newArticle.tags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+          .join(",")
+      );
       form.append("difficulty", newArticle.difficulty);
       files.forEach((f) => form.append("attachments", f));
       const res = await createArticleForm(form);
@@ -263,10 +278,26 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
       const res = await updateArticle(editing._id, {
         title: editing.title,
         content: editing.content,
-        category: editing.category as 'technology' | 'marketing' | 'analytics' | 'ai' | 'business' | 'tutorial' | 'news' | 'case-study' | 'best-practices' | 'tools',
-        type: editing.type as 'guide' | 'tutorial' | 'checklist' | 'comparison',
-        tags: editing.tags.split(",").map(tag => tag.trim()).filter(Boolean),
-        difficulty: editing.difficulty as 'Beginner' | 'Intermediate' | 'Advanced',
+        category: editing.category as
+          | "technology"
+          | "marketing"
+          | "analytics"
+          | "ai"
+          | "business"
+          | "tutorial"
+          | "news"
+          | "case-study"
+          | "best-practices"
+          | "tools",
+        type: editing.type as "guide" | "tutorial" | "checklist" | "comparison",
+        tags: editing.tags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+        difficulty: editing.difficulty as
+          | "Beginner"
+          | "Intermediate"
+          | "Advanced",
       });
       const updated = res.data.article;
       setArticles((prev) =>
@@ -300,7 +331,9 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
     if (!result.isConfirmed) return;
     try {
       await deleteArticle(article._id!);
-      setArticles((prev) => prev.filter((a: IArticle) => a._id !== article._id));
+      setArticles((prev) =>
+        prev.filter((a: IArticle) => a._id !== article._id)
+      );
       Swal.fire({
         icon: "success",
         title: "Deleted",
@@ -388,12 +421,18 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
   };
 
   const categories: IArticleCategory[] = [
-    { id: "all", name: "All Categories", count: articles.filter((a) => a.status === "published").length },
+    {
+      id: "all",
+      name: "All Categories",
+      count: articles.filter((a) => a.status === "published").length,
+    },
     ...articleCategories.map((cat: IDropdownOption) => ({
       id: cat.value,
       name: cat.label,
       count: articles.filter(
-        (a: IArticle) => a.category.toLowerCase() === cat.value.toLowerCase() && a.status === "published"
+        (a: IArticle) =>
+          a.category.toLowerCase() === cat.value.toLowerCase() &&
+          a.status === "published"
       ).length,
     })),
   ];
@@ -478,8 +517,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                     }
                   >
                     <SelectTrigger
-                      className={newArticleErrors.type ? "border-red-500" : ""
-                      }
+                      className={newArticleErrors.type ? "border-red-500" : ""}
                     >
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
@@ -532,13 +570,15 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                 />
                 {newArticleErrors.content && (
                   <p className="text-red-500 text-xs mt-1">
-                      {newArticleErrors.content}
+                    {newArticleErrors.content}
                   </p>
                 )}
               </div>
 
               <div>
-                <label className="text-sm font-medium">Attachments (max 3 files, {MAX_FILE_SIZE_MB_KNOWLEDGE}MB each)</label>
+                <label className="text-sm font-medium">
+                  Attachments (max 3 files, {MAX_FILE_SIZE_MB_KNOWLEDGE}MB each)
+                </label>
                 <Input
                   type="file"
                   multiple
@@ -586,9 +626,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
         {categories.map((category: IArticleCategory) => (
           <Button
             key={category.id}
-            variant={
-              selectedCategory === category.id ? "default" : "outline"
-            }
+            variant={selectedCategory === category.id ? "default" : "outline"}
             onClick={() => setSelectedCategory(category.id)}
             size="sm"
           >
@@ -627,66 +665,66 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {loadingArticles ? (
           <SectionLoader />
-        ) : sortedArticles.map((article: IArticle) => (
-          <Card
-            key={article._id}
-            className="hover:shadow-lg transition-shadow cursor-pointer"
-            onClick={() => onViewArticle(article)}
-          >
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center space-x-2">
-                  {getTypeIcon(article.type)}
-                  <Badge variant="outline" className="text-xs">
-                    {article.type}
-                  </Badge>
-                  <Badge
-                    className={`text-xs ${getDifficultyColor(
-                      article.difficulty
-                    )}`}
+        ) : (
+          sortedArticles.map((article: IArticle) => (
+            <Card
+              key={article._id}
+              className="hover:shadow-lg transition-shadow cursor-pointer"
+              onClick={() => onViewArticle(article)}
+            >
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center space-x-2">
+                    {getTypeIcon(article.type)}
+                    <Badge variant="outline" className="text-xs">
+                      {article.type}
+                    </Badge>
+                    <Badge
+                      className={`text-xs ${getDifficultyColor(
+                        article.difficulty
+                      )}`}
+                    >
+                      {article.difficulty}
+                    </Badge>
+                    {(isAdmin ||
+                      (typeof article.author === "object" &&
+                        article.author !== null &&
+                        user._id === article.author._id)) &&
+                      article.status !== "published" && (
+                        <Badge className="text-xs bg-orange-100 text-orange-700 capitalize">
+                          {article.status}
+                        </Badge>
+                      )}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {article.readingTime} min read
+                  </div>
+                </div>
+                <CardTitle className="text-lg text-balance">
+                  {article.title}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground text-pretty line-clamp-3">
+                  {article.content}
+                </p>
+                <div>
+                  <Button
+                    variant="link"
+                    className="px-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onViewArticle(article);
+                    }}
                   >
-                    {article.difficulty}
-                  </Badge>
-                  {(isAdmin || (typeof article.author === 'object' && article.author !== null && user._id === article.author._id)) &&
-                    article.status !== "published" && (
-                      <Badge className="text-xs bg-orange-100 text-orange-700 capitalize">
-                        {article.status}
-                      </Badge>
-                    )}
+                    … Learn more
+                  </Button>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {article.readingTime} min read
-                </div>
-              </div>
-              <CardTitle className="text-lg text-balance">
-                {article.title}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground text-pretty line-clamp-3">
-                {article.content}
-              </p>
-              <div>
-                <Button
-                  variant="link"
-                  className="px-0"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onViewArticle(article);
-                  }}
-                >
-                  … Learn more
-                </Button>
-              </div>
 
-              <div className="flex flex-wrap gap-1">
-                {article.tags
-                  .slice(0, 3)
-                  .map(
-                    (
-                      tag: string,
-                      index: Key | null | undefined
-                    ) => (
+                <div className="flex flex-wrap gap-1">
+                  {article.tags
+                    .slice(0, 3)
+                    .map((tag: string, index: Key | null | undefined) => (
                       <Badge
                         key={index}
                         variant="secondary"
@@ -694,101 +732,115 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                       >
                         #{tag}
                       </Badge>
-                    )
+                    ))}
+                  {article.tags.length > 3 && (
+                    <Badge variant="outline" className="text-xs">
+                      +{article.tags.length - 3}
+                    </Badge>
                   )}
-                {article.tags.length > 3 && (
-                  <Badge variant="outline" className="text-xs">
-                    +{article.tags.length - 3}
-                  </Badge>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between pt-2 border-t">
-                <div className="flex items-center space-x-3">
-                  <Avatar className="w-6 h-6">
-                    <AvatarImage
-                      src={(typeof article.author === 'object' ? article.author.avatar : undefined) || "/placeholder.svg"}
-                      alt={(typeof article.author === 'object' ? article.author.name : article.author as string) || "User"}
-                    />
-                    <AvatarFallback className="text-xs">
-                      {((typeof article.author === 'object' ? article.author.name : article.author as string) || "U")
-                        .split(" ")
-                        .map((n: string) => n[0])
-                        .join("")}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="text-xs font-medium">
-                      {(typeof article.author === 'object' ? article.author.name : article.author as string)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatTimeAgo(article.updatedAt)}
-                    </p>
-                  </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <div className="flex items-center space-x-1 text-xs text-muted-foreground">
-                    <Eye className="w-3 h-3" />
-                    {article.views}
+                <div className="flex items-center justify-between pt-2 border-t">
+                  <div className="flex items-center space-x-3">
+                    <Avatar className="w-6 h-6">
+                      <AvatarImage
+                        src={
+                          (typeof article.author === "object"
+                            ? article.author.avatar
+                            : undefined) || "/placeholder.svg"
+                        }
+                        alt={
+                          (typeof article.author === "object"
+                            ? article.author.name
+                            : (article.author as string)) || "User"
+                        }
+                      />
+                      <AvatarFallback className="text-xs">
+                        {(
+                          (typeof article.author === "object"
+                            ? article.author.name
+                            : (article.author as string)) || "U"
+                        )
+                          .split(" ")
+                          .map((n: string) => n[0])
+                          .join("")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-xs font-medium">
+                        {typeof article.author === "object"
+                          ? article.author.name
+                          : (article.author as string)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatTimeAgo(article.updatedAt)}
+                      </p>
+                    </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleLike(article._id!);
-                    }}
-                    className={`p-1 h-auto ${
-                      (article.likes || []).includes(user._id!) ? "text-red-500" : ""
-                    }`}
-                  >
-                    <ThumbsUp
-                      className={`w-3 h-3 ${
-                        (article.likes || []).includes(user._id!) ? "fill-current" : ""
+
+                  <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1 text-xs text-muted-foreground">
+                      <Eye className="w-3 h-3" />
+                      {article.views}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleLike(article._id!);
+                      }}
+                      className={`p-1 h-auto ${
+                        article.isLiked ? "text-blue-500" : ""
                       }`}
-                    />
-                    <span className="ml-1 text-xs">{(article.likes || []).length}</span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleBookmark(article._id!);
-                    }}
-                    className={`p-1 h-auto ${
-                      (article.bookmarks || []).includes(user._id!) ? "text-blue-500" : ""
-                    }`}
-                  >
-                    <Bookmark
-                      className={`w-3 h-3 ${
-                        (article.bookmarks || []).includes(user._id!) ? "fill-current" : ""
+                    >
+                      <ThumbsUp
+                        className={`w-3 h-3 ${
+                          article.isLiked ? "fill-current" : ""
+                        }`}
+                      />
+                      <span className="ml-1 text-xs">{article.likes}</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleBookmark(article._id!);
+                      }}
+                      className={`p-1 h-auto ${
+                        article.isBookmarked ? "text-red-500" : ""
                       }`}
-                    />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="p-1 h-auto"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const origin =
-                        typeof window !== "undefined"
-                          ? window.location.origin
-                          : "";
-                      const url = `${origin}/knowledge/${article._id}`;
-                      setShareUrl(url);
-                      setShareOpen(true);
-                    }}
-                  >
-                    <Share className="w-3 h-3" />
-                  </Button>
+                    >
+                      <Bookmark
+                        className={`w-3 h-3 ${
+                          article.isBookmarked ? "fill-current" : ""
+                        }`}
+                      />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="p-1 h-auto"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const origin =
+                          typeof window !== "undefined"
+                            ? window.location.origin
+                            : "";
+                        const url = `${origin}/knowledge/${article._id}`;
+                        setShareUrl(url);
+                        setShareOpen(true);
+                      }}
+                    >
+                      <Share className="w-3 h-3" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
       {/* Share Dialog */}

@@ -136,7 +136,7 @@ export default function Home() {
             <div className="space-y-4">
               {loadingFeed ? (
                 <SectionLoader />
-              ) : (feedActivities.map((activity) => (
+              ) : (feedActivities.map((activity: any) => (
                 <Card
                   key={activity.id}
                   className="hover:shadow-md transition-shadow"
@@ -197,7 +197,7 @@ export default function Home() {
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+              )))}
               {feedHasMore && (
                 <div className="flex justify-center pt-2">
                   <Button

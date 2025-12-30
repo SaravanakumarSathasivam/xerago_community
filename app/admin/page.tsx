@@ -33,7 +33,7 @@ export default function AdminPage() {
     return <div>Loading...</div>;
   }
 
-  if (!user || user.role !== "admin" && user.role !== "superadmin") {
+  if (!user || user.role !== "admin" && user.role !== "super_admin") {
     router.push("/");
     Swal.fire({
       icon: "error",

@@ -312,7 +312,7 @@ export function CommunityDashboard({
                 <div className="space-y-2">
                   <span className="text-sm">Badges</span>
                   <div className="flex flex-wrap gap-1">
-                    {user.gamification?.badges.map((badge: string, index: number) => (
+                    {user.gamification?.badges?.map((badge: string, index: number) => (
                       <Badge
                         key={index}
                         variant="secondary"
