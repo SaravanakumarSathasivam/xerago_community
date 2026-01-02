@@ -99,6 +99,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
   const isAdmin = user.role === "admin";
+  const [newPostErrors, setNewPostErrors] = useState<Record<string, string>>({});
 
   // Fetch dropdown options from API
   const { options: forumCategories, loading: forumCategoriesLoading } =
@@ -191,6 +192,17 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
   };
 
   const handleCreatePost = async () => {
+    const errors: Record<string, string> = {};
+    if (!newPost.title) errors.title = "Title is required";
+    if (!newPost.content) errors.content = "Content is required";
+    if (!newPost.category) errors.category = "Category is required";
+
+    if (Object.keys(errors).length > 0) {
+      setNewPostErrors(errors);
+      return;
+    }
+
+    setNewPostErrors({}); // Clear previous errors
     try {
       const formData = new FormData();
       formData.append("title", newPost.title);
@@ -222,12 +234,10 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
         text: "Your discussion was created.",
       });
     } catch (error: unknown) {
-      Swal.fire({
-        icon: "error",
-        title: "Create failed",
-        text: (error as Error)?.message || "Failed to create post",
-        timer: 3000,
+      setNewPostErrors({
+        apiError: (error as Error)?.message || "Failed to create post",
       });
+      // Do not close the dialog
     }
   };
 
@@ -1128,20 +1138,26 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                 <Input
                   placeholder="What would you like to discuss?"
                   value={newPost.title}
-                  onChange={(e) =>
-                    setNewPost({ ...newPost, title: e.target.value })
-                  }
+                  onChange={(e) => {
+                    setNewPost({ ...newPost, title: e.target.value });
+                    setNewPostErrors((prev) => { delete prev.title; delete prev.apiError; return { ...prev }; });
+                  }}
+                  className={newPostErrors.title ? "border-red-500" : ""}
                 />
+                {newPostErrors.title && (
+                  <p className="text-red-500 text-xs mt-1">{newPostErrors.title}</p>
+                )}
               </div>
               <div>
                 <label className="text-sm font-medium">Category</label>
                 <Select
                   value={newPost.category}
-                  onValueChange={(value) =>
-                    setNewPost({ ...newPost, category: value })
-                  }
+                  onValueChange={(value) => {
+                    setNewPost({ ...newPost, category: value });
+                    setNewPostErrors((prev) => { delete prev.category; delete prev.apiError; return { ...prev }; });
+                  }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={newPostErrors.category ? "border-red-500" : ""}>
                     <SelectValue placeholder="Select a category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1152,6 +1168,9 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                     ))}
                   </SelectContent>
                 </Select>
+                {newPostErrors.category && (
+                  <p className="text-red-500 text-xs mt-1">{newPostErrors.category}</p>
+                )}
               </div>
               <div>
                 <label className="text-sm font-medium">Content</label>
@@ -1159,10 +1178,15 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                   placeholder="Share your thoughts, questions, or insights..."
                   rows={6}
                   value={newPost.content}
-                  onChange={(e) =>
-                    setNewPost({ ...newPost, content: e.target.value })
-                  }
+                  onChange={(e) => {
+                    setNewPost({ ...newPost, content: e.target.value });
+                    setNewPostErrors((prev) => { delete prev.content; delete prev.apiError; return { ...prev }; });
+                  }}
+                  className={newPostErrors.content ? "border-red-500" : ""}
                 />
+                {newPostErrors.content && (
+                  <p className="text-red-500 text-xs mt-1">{newPostErrors.content}</p>
+                )}
               </div>
               <div>
                 <label className="text-sm font-medium">
@@ -1171,9 +1195,10 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                 <Input
                   placeholder="e.g., AI, Marketing, Best Practices"
                   value={newPost.tags}
-                  onChange={(e) =>
-                    setNewPost({ ...newPost, tags: e.target.value })
-                  }
+                  onChange={(e) => {
+                    setNewPost({ ...newPost, tags: e.target.value });
+                    setNewPostErrors((prev) => { delete prev.tags; delete prev.apiError; return { ...prev }; });
+                  }}
                 />
               </div>
               <div>
@@ -1223,6 +1248,9 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                   </div>
                 )}
               </div>
+              {newPostErrors.apiError && (
+                <p className="text-red-500 text-xs mt-1">{newPostErrors.apiError}</p>
+              )}
               <div className="flex gap-2 pt-4">
                 <Button
                   onClick={handleCreatePost}
@@ -1231,7 +1259,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                     !newPost.title ||
                     !newPost.content ||
                     !newPost.category ||
-                    !newPost.tags
+                    Object.keys(newPostErrors).length > 0
                   }
                 >
                   Create Discussion

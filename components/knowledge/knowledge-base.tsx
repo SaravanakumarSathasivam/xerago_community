@@ -196,7 +196,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
       setNewArticleErrors(errors);
       return;
     }
-    setNewArticleErrors({});
+    setNewArticleErrors({}); // Clear previous errors
     try {
       const form = new FormData();
       form.append("title", newArticle.title);
@@ -216,29 +216,27 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
       const res = await createArticleForm(form);
       const created = res.data.article;
       setArticles((prev) => [{ ...created }, ...prev]);
+      setNewArticle({
+        title: "",
+        content: "",
+        category: "",
+        type: "",
+        tags: "",
+        difficulty: "Beginner",
+      });
+      setFiles([]);
+      setIsCreateDialogOpen(false);
       Swal.fire({
         icon: "success",
         title: "Article submitted",
         text: "Your article was submitted for approval.",
       });
     } catch (e: unknown) {
-      Swal.fire({
-        icon: "error",
-        title: "Create failed",
-        text: (e as Error)?.message || "Please try again.",
+      setNewArticleErrors({
+        apiError: (e as Error)?.message || "Failed to create article",
       });
+      // Do not close the dialog
     }
-
-    setNewArticle({
-      title: "",
-      content: "",
-      category: "",
-      type: "",
-      tags: "",
-      difficulty: "Beginner",
-    });
-    setFiles([]);
-    setIsCreateDialogOpen(false);
   };
 
   const onViewArticle = (article: IArticle) => {
@@ -466,9 +464,10 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                   <Input
                     placeholder="Enter article title"
                     value={newArticle.title}
-                    onChange={(e) =>
-                      setNewArticle({ ...newArticle, title: e.target.value })
-                    }
+                    onChange={(e) => {
+                      setNewArticle({ ...newArticle, title: e.target.value });
+                      setNewArticleErrors((prev) => { delete prev.title; delete prev.apiError; return { ...prev }; });
+                    }}
                   />
                   {newArticleErrors.title && (
                     <p className="text-red-500 text-xs mt-1">
@@ -480,9 +479,10 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                   <label className="text-sm font-medium">Category</label>
                   <Select
                     value={newArticle.category}
-                    onValueChange={(value) =>
-                      setNewArticle({ ...newArticle, category: value })
-                    }
+                    onValueChange={(value) => {
+                      setNewArticle({ ...newArticle, category: value });
+                      setNewArticleErrors((prev) => { delete prev.category; delete prev.apiError; return { ...prev }; });
+                    }}
                   >
                     <SelectTrigger
                       className={
@@ -510,25 +510,26 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium">Type</label>
-                  <Select
-                    value={newArticle.type}
-                    onValueChange={(value) =>
-                      setNewArticle({ ...newArticle, type: value })
-                    }
-                  >
-                    <SelectTrigger
-                      className={newArticleErrors.type ? "border-red-500" : ""}
+                    <Select
+                      value={newArticle.type}
+                      onValueChange={(value) => {
+                        setNewArticle({ ...newArticle, type: value });
+                        setNewArticleErrors((prev) => { delete prev.type; delete prev.apiError; return { ...prev }; });
+                      }}
                     >
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {articleTypes.map((type: IDropdownOption) => (
-                        <SelectItem key={type._id} value={type.value}>
-                          {type.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                      <SelectTrigger
+                        className={newArticleErrors.type ? "border-red-500" : ""}
+                      >
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {articleTypes.map((type: IDropdownOption) => (
+                          <SelectItem key={type._id} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   {newArticleErrors.type && (
                     <p className="text-red-500 text-xs mt-1">
                       {newArticleErrors.type}
@@ -563,9 +564,10 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                   placeholder="Share your knowledge, insights, and best practices..."
                   rows={8}
                   value={newArticle.content}
-                  onChange={(e) =>
-                    setNewArticle({ ...newArticle, content: e.target.value })
-                  }
+                  onChange={(e) => {
+                    setNewArticle({ ...newArticle, content: e.target.value });
+                    setNewArticleErrors((prev) => { delete prev.content; delete prev.apiError; return { ...prev }; });
+                  }}
                   className={newArticleErrors.content ? "border-red-500" : ""}
                 />
                 {newArticleErrors.content && (
@@ -605,8 +607,23 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                 )}
               </div>
 
+              {newArticleErrors.apiError && (
+                <p className="text-red-500 text-sm mt-1 text-center">
+                  {newArticleErrors.apiError}
+                </p>
+              )}
               <div className="flex gap-2 pt-4">
-                <Button onClick={handleCreateArticle} className="flex-1">
+                <Button
+                  onClick={handleCreateArticle}
+                  className="flex-1"
+                  disabled={
+                    !newArticle.title ||
+                    !newArticle.content ||
+                    !newArticle.category ||
+                    !newArticle.type ||
+                    Object.keys(newArticleErrors).length > 0
+                  }
+                >
                   Publish Article
                 </Button>
                 <Button

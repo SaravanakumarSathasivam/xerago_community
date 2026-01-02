@@ -1,12 +1,7 @@
 "use client";
 
 import {
-  AwaitedReactNode,
-  JSXElementConstructor,
   Key,
-  ReactElement,
-  ReactNode,
-  ReactPortal,
   useEffect,
   useState,
 } from "react";
@@ -103,6 +98,7 @@ export function EventsPortal({ user }: EventsPortalProps) {
     maxAttendees: "",
     tags: "",
   });
+  const [newEventErrors, setNewEventErrors] = useState<Record<string, string>>({});
   const [eventFiles, setEventFiles] = useState<File[]>([]);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [attendeesDialogOpen, setAttendeesDialogOpen] = useState(false);
@@ -166,20 +162,27 @@ export function EventsPortal({ user }: EventsPortalProps) {
   };
 
   const handleCreateEvent = async () => {
-    if (
-      !newEvent.title ||
-      !newEvent.description ||
-      !newEvent.date ||
-      !newEvent.location
-    )
-      return;
+    const errors: Record<string, string> = {};
+    if (!newEvent.title) errors.title = "Event Title is required";
+    if (!newEvent.description) errors.description = "Description is required";
+    if (!newEvent.date) errors.date = "Start Date & Time is required";
+    if (!newEvent.endDate) errors.endDate = "End Date & Time is required";
+    if (!newEvent.location) errors.location = "Location is required";
+    if (!newEvent.type) errors.type = "Type is required";
+    if (!newEvent.category) errors.category = "Category is required";
 
+    if (Object.keys(errors).length > 0) {
+      setNewEventErrors(errors);
+      return;
+    }
+
+    setNewEventErrors({}); // Clear previous errors
     try {
       const form = new FormData()
       form.append('title', newEvent.title)
       form.append('description', newEvent.description)
-      form.append('startDate', newEvent.date)
-      form.append('endDate', newEvent.endDate || newEvent.date)
+      form.append('startDate', new Date(newEvent.date).toISOString())
+      form.append('endDate', new Date(newEvent.endDate || newEvent.date).toISOString())
       form.append('location', newEvent.location)
       form.append('type', newEvent.type)
       form.append('category', newEvent.category)
@@ -189,24 +192,26 @@ export function EventsPortal({ user }: EventsPortalProps) {
       const res = await createEventForm(form);
       const created = res.data.event;
       setEvents((prev) => [created, ...prev]);
+      setNewEvent({
+        title: "",
+        description: "",
+        date: "",
+        endDate: "",
+        location: "",
+        type: "",
+        category: "",
+        maxAttendees: "",
+        tags: "",
+      });
+      setEventFiles([])
+      setIsCreateDialogOpen(false);
       Swal.fire({ icon: 'success', title: 'Event created', text: 'Your event was created successfully.' })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Create failed', text: (e as Error)?.message || 'Please try again.' })
+      setNewEventErrors({
+        apiError: (e as Error)?.message || "Failed to create event",
+      });
+      // Do not close the dialog
     }
-
-    setNewEvent({
-      title: "",
-      description: "",
-      date: "",
-      endDate: "",
-      location: "",
-      type: "",
-      category: "",
-      maxAttendees: "",
-      tags: "",
-    });
-    setEventFiles([])
-    setIsCreateDialogOpen(false);
   };
 
   const formatEventDate = (date: Date) => {
@@ -360,20 +365,30 @@ export function EventsPortal({ user }: EventsPortalProps) {
                     <Input
                       placeholder="Enter event title"
                       value={newEvent.title}
-                      onChange={(e) =>
-                        setNewEvent({ ...newEvent, title: e.target.value })
-                      }
+                      onChange={(e) => {
+                        setNewEvent({ ...newEvent, title: e.target.value });
+                        setNewEventErrors((prev) => { delete prev.title; delete prev.apiError; return { ...prev }; });
+                      }}
+                      className={newEventErrors.title ? "border-red-500" : ""}
                     />
+                    {newEventErrors.title && (
+                      <p className="text-red-500 text-xs mt-1">{newEventErrors.title}</p>
+                    )}
                   </div>
                   <div>
                     <label className="text-sm font-medium">Location</label>
                     <Input
                       placeholder="Conference Room A / Virtual"
                       value={newEvent.location}
-                      onChange={(e) =>
-                        setNewEvent({ ...newEvent, location: e.target.value })
-                      }
+                      onChange={(e) => {
+                        setNewEvent({ ...newEvent, location: e.target.value });
+                        setNewEventErrors((prev) => { delete prev.location; delete prev.apiError; return { ...prev }; });
+                      }}
+                      className={newEventErrors.location ? "border-red-500" : ""}
                     />
+                    {newEventErrors.location && (
+                      <p className="text-red-500 text-xs mt-1">{newEventErrors.location}</p>
+                    )}
                   </div>
                 </div>
 
@@ -382,11 +397,12 @@ export function EventsPortal({ user }: EventsPortalProps) {
                     <label className="text-sm font-medium">Type</label>
                     <Select
                       value={newEvent.type}
-                      onValueChange={(value) =>
-                        setNewEvent({ ...newEvent, type: value })
-                      }
+                      onValueChange={(value) => {
+                        setNewEvent({ ...newEvent, type: value });
+                        setNewEventErrors((prev) => { delete prev.type; delete prev.apiError; return { ...prev }; });
+                      }}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className={newEventErrors.type ? "border-red-500" : ""}>
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -397,16 +413,20 @@ export function EventsPortal({ user }: EventsPortalProps) {
                         ))}
                       </SelectContent>
                     </Select>
+                    {newEventErrors.type && (
+                      <p className="text-red-500 text-xs mt-1">{newEventErrors.type}</p>
+                    )}
                   </div>
                   <div>
                     <label className="text-sm font-medium">Category</label>
                     <Select
                       value={newEvent.category}
-                      onValueChange={(value) =>
-                        setNewEvent({ ...newEvent, category: value })
-                      }
+                      onValueChange={(value) => {
+                        setNewEvent({ ...newEvent, category: value });
+                        setNewEventErrors((prev) => { delete prev.category; delete prev.apiError; return { ...prev }; });
+                      }}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className={newEventErrors.category ? "border-red-500" : ""}>
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
@@ -417,6 +437,9 @@ export function EventsPortal({ user }: EventsPortalProps) {
                         ))}
                       </SelectContent>
                     </Select>
+                    {newEventErrors.category && (
+                      <p className="text-red-500 text-xs mt-1">{newEventErrors.category}</p>
+                    )}
                   </div>
                   <div>
                     <label className="text-sm font-medium">Max Attendees</label>
@@ -442,10 +465,15 @@ export function EventsPortal({ user }: EventsPortalProps) {
                     <Input
                       type="datetime-local"
                       value={newEvent.date}
-                      onChange={(e) =>
-                        setNewEvent({ ...newEvent, date: e.target.value })
-                      }
+                      onChange={(e) => {
+                        setNewEvent({ ...newEvent, date: e.target.value });
+                        setNewEventErrors((prev) => { delete prev.date; delete prev.apiError; return { ...prev }; });
+                      }}
+                      className={newEventErrors.date ? "border-red-500" : ""}
                     />
+                    {newEventErrors.date && (
+                      <p className="text-red-500 text-xs mt-1">{newEventErrors.date}</p>
+                    )}
                   </div>
                   <div>
                     <label className="text-sm font-medium">
@@ -454,10 +482,15 @@ export function EventsPortal({ user }: EventsPortalProps) {
                     <Input
                       type="datetime-local"
                       value={newEvent.endDate}
-                      onChange={(e) =>
-                        setNewEvent({ ...newEvent, endDate: e.target.value })
-                      }
+                      onChange={(e) => {
+                        setNewEvent({ ...newEvent, endDate: e.target.value });
+                        setNewEventErrors((prev) => { delete prev.endDate; delete prev.apiError; return { ...prev }; });
+                      }}
+                      className={newEventErrors.endDate ? "border-red-500" : ""}
                     />
+                    {newEventErrors.endDate && (
+                      <p className="text-red-500 text-xs mt-1">{newEventErrors.endDate}</p>
+                    )}
                   </div>
                 </div>
 
@@ -467,10 +500,15 @@ export function EventsPortal({ user }: EventsPortalProps) {
                     placeholder="Describe your event, what attendees will learn or experience..."
                     rows={4}
                     value={newEvent.description}
-                    onChange={(e) =>
-                      setNewEvent({ ...newEvent, description: e.target.value })
-                    }
+                    onChange={(e) => {
+                      setNewEvent({ ...newEvent, description: e.target.value });
+                      setNewEventErrors((prev) => { delete prev.description; delete prev.apiError; return { ...prev }; });
+                    }}
+                    className={newEventErrors.description ? "border-red-500" : ""}
                   />
+                  {newEventErrors.description && (
+                    <p className="text-red-500 text-xs mt-1">{newEventErrors.description}</p>
+                  )}
                 </div>
 
                 <div>
@@ -491,7 +529,17 @@ export function EventsPortal({ user }: EventsPortalProps) {
                     <label className="text-sm font-medium">Attachments</label>
                     <Input type="file" multiple onChange={(e) => setEventFiles(e.target.files ? Array.from(e.target.files) : [])} />
                   </div>
-                  <Button onClick={handleCreateEvent} className="flex-1">
+                  <Button onClick={handleCreateEvent} className="flex-1"
+                    disabled={
+                      !newEvent.title ||
+                      !newEvent.description ||
+                      !newEvent.date ||
+                      !newEvent.location ||
+                      !newEvent.type ||
+                      !newEvent.category ||
+                      Object.keys(newEventErrors).length > 0
+                    }
+                  >
                     Create Event
                   </Button>
                   <Button
@@ -501,6 +549,9 @@ export function EventsPortal({ user }: EventsPortalProps) {
                     Cancel
                   </Button>
                 </div>
+                {newEventErrors.apiError && (
+                  <p className="text-red-500 text-xs mt-1 text-center">{newEventErrors.apiError}</p>
+                )}
               </div>
             </DialogContent>
           </Dialog>

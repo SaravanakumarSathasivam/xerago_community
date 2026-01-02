@@ -13,3 +13,4 @@ export interface IPointSettings extends IDocument {
     // Add other point-related settings as needed
   };
 }
+

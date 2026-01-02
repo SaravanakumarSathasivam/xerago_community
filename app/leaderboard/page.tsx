@@ -14,12 +14,12 @@ export default function LeaderboardPage() {
   let storedUser = localStorage.getItem('xerago-user');
   if (storedUser) {
     user = JSON.parse(storedUser);
-  }
+}
 
   const handleLogout = () => {
     user = null;
     localStorage.removeItem('xerago-user');
-    router.push('/login');
+    router.push('/');
   };
 
   return (

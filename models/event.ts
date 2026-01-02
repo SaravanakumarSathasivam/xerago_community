@@ -70,7 +70,7 @@ export interface IFeedback {
 export interface IEvent extends IDocument {
   title: string;
   description: string;
-  organizer: string;
+  organizer: object;
   category: 'workshop' | 'seminar' | 'meeting' | 'training' | 'conference' | 'social' | 'team-building' | 'presentation' | 'webinar' | 'other';
   type: 'online' | 'offline' | 'hybrid';
   location?: ILocation;

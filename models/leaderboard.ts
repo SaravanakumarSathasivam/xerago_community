@@ -23,3 +23,4 @@ export interface IEarnedAchievement {
   achievement: IAchievement;
   earnedAt: Date;
 }
+

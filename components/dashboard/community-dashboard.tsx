@@ -34,11 +34,11 @@ import { getFeed, getTopContributors, FeedItem } from "@/lib/api";
 import { formatTimestamp } from "@/helper/helper";
 import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
-import { IUser } from '@/models/user';
-import { IArticle } from '@/models/article';
-import { IEvent } from '@/models/event';
-import { IForum } from '@/models/forum';
-import { IAchievement } from '@/models/achievement';
+import { IUser } from "@/models/user";
+import { IArticle } from "@/models/article";
+import { IEvent } from "@/models/event";
+import { IForum } from "@/models/forum";
+import { IAchievement } from "@/models/achievement";
 
 interface IFeedActivity extends FeedItem {
   title: string;
@@ -57,7 +57,7 @@ interface ITopContributor {
 }
 
 interface CommunityDashboardProps {
-  user: IUser;
+  user: IUser | null;
   onLogout: () => void;
   children: ReactNode;
 }
@@ -73,7 +73,11 @@ export function CommunityDashboard({
   const router = useRouter();
   const pathname = usePathname();
 
-  const isAdmin = user.role === "admin";
+  const currentUser = user
+    ? user
+    : JSON.parse(localStorage.getItem("xerago-user") || "{}");
+
+  const isAdmin = currentUser?.role === "admin";
 
   const [feedActivities, setFeedActivities] = useState<IFeedActivity[]>([]);
   const [feedPage, setFeedPage] = useState(1);
@@ -85,13 +89,15 @@ export function CommunityDashboard({
     const fetchTopContributors = async () => {
       try {
         const res = await getTopContributors();
-        setTopContributors(res.data.topContributors.map(tc => ({
-          id: tc._id,
-          name: tc.name,
-          avatar: tc.avatar,
-          contribution: tc.gamification?.totalMonthlyContributions || 0,
-          points: tc.gamification?.points || 0,
-        })));
+        setTopContributors(
+          res.data.topContributors.map((tc) => ({
+            id: tc._id,
+            name: tc.name,
+            avatar: tc.avatar,
+            contribution: tc.gamification?.totalMonthlyContributions || 0,
+            points: tc.gamification?.points || 0,
+          }))
+        );
       } catch (error) {
         console.error("Error fetching top contributors:", error);
       }
@@ -140,7 +146,10 @@ export function CommunityDashboard({
     try {
       const nextPage = feedPage + 1;
       const res = await getFeed(nextPage, 5);
-      setFeedActivities((prev) => [...prev, ...res.data.items as IFeedActivity[]]);
+      setFeedActivities((prev) => [
+        ...prev,
+        ...(res.data.items as IFeedActivity[]),
+      ]);
       setFeedPage(nextPage);
       setFeedHasMore(res.data.page < res.data.totalPages);
     } catch (e: unknown) {
@@ -148,7 +157,7 @@ export function CommunityDashboard({
     }
   };
 
-  const getActivityIcon = (type: IFeedActivity['type']) => {
+  const getActivityIcon = (type: IFeedActivity["type"]) => {
     switch (type) {
       case "article":
         return <BookOpen className="w-4 h-4" />;
@@ -163,7 +172,7 @@ export function CommunityDashboard({
     }
   };
 
-  const getActivityColor = (type: IFeedActivity['type']) => {
+  const getActivityColor = (type: IFeedActivity["type"]) => {
     switch (type) {
       case "article":
         return "bg-emerald-100 text-emerald-700";
@@ -193,7 +202,7 @@ export function CommunityDashboard({
     <div className="min-h-screen bg-background">
       {showWelcomePopup && (
         <WelcomePopup
-          userName={user.name}
+          userName={currentUser?.name}
           onClose={() => setShowWelcomePopup(false)}
         />
       )}
@@ -239,16 +248,16 @@ export function CommunityDashboard({
                   <div className="flex items-center space-x-3 cursor-pointer">
                     <Avatar className="w-8 h-8">
                       <AvatarFallback>
-                        {user.name
+                        {currentUser?.name
                           .split(" ")
                           .map((n: string) => n[0])
                           .join("")}
                       </AvatarFallback>
                     </Avatar>
                     <div className="hidden md:block">
-                      <p className="text-sm font-medium">{user.name}</p>
+                      <p className="text-sm font-medium">{currentUser?.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {user.department}
+                        {currentUser?.department}
                       </p>
                     </div>
                   </div>
@@ -281,16 +290,16 @@ export function CommunityDashboard({
                 <div className="flex items-center space-x-3">
                   <Avatar className="w-12 h-12">
                     <AvatarFallback>
-                      {user.name
+                      {currentUser?.name
                         .split(" ")
                         .map((n: string) => n[0])
                         .join("")}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <h3 className="font-semibold">{user.name}</h3>
+                    <h3 className="font-semibold">{currentUser?.name}</h3>
                     <p className="text-sm text-muted-foreground">
-                      {user.department}
+                      {currentUser?.department}
                     </p>
                   </div>
                 </div>
@@ -302,25 +311,29 @@ export function CommunityDashboard({
                     variant="secondary"
                     className="bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700"
                   >
-                    {user.gamification?.points}
+                    {currentUser?.gamification?.points}
                   </Badge>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Level</span>
-                  <Badge variant="outline">Level {user.gamification?.level}</Badge>
+                  <Badge variant="outline">
+                    Level {currentUser?.gamification?.level}
+                  </Badge>
                 </div>
                 <div className="space-y-2">
                   <span className="text-sm">Badges</span>
                   <div className="flex flex-wrap gap-1">
-                    {user.gamification?.badges?.map((badge: string, index: number) => (
-                      <Badge
-                        key={index}
-                        variant="secondary"
-                        className="text-xs"
-                      >
-                        {badge}
-                      </Badge>
-                    ))}
+                    {currentUser?.gamification?.badges?.map(
+                      (badge: string, index: number) => (
+                        <Badge
+                          key={index}
+                          variant="secondary"
+                          className="text-xs"
+                        >
+                          {badge}
+                        </Badge>
+                      )
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -329,30 +342,46 @@ export function CommunityDashboard({
             {/* Top Contributors */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Top Contributors (Monthly)</CardTitle>
+                <CardTitle className="text-lg">
+                  Top Contributors (Monthly)
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {topContributors.length > 0 ? (
                   <div className="space-y-3">
                     {topContributors.map((contributor: ITopContributor) => (
-                      <div key={contributor.id} className="flex items-center justify-between">
+                      <div
+                        key={contributor.id}
+                        className="flex items-center justify-between"
+                      >
                         <div className="flex items-center space-x-3">
                           <Avatar className="w-8 h-8">
                             <AvatarFallback>
-                              {contributor.name.split(" ").map((n: string) => n[0]).join("")}
+                              {contributor.name
+                                .split(" ")
+                                .map((n: string) => n[0])
+                                .join("")}
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <p className="text-sm font-medium">{contributor.name}</p>
-                            <p className="text-xs text-muted-foreground">{contributor.contribution} Contributions</p>
+                            <p className="text-sm font-medium">
+                              {contributor.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {contributor.contribution} Contributions
+                            </p>
                           </div>
                         </div>
-                        <Badge variant="secondary">{contributor.points} Points</Badge>
+                        <Badge variant="secondary">
+                          {contributor.points} Points
+                        </Badge>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">No contributors yet this month.</p>
+                  <p className="text-sm text-muted-foreground">
+                    No contributors yet this month.
+                  </p>
                 )}
               </CardContent>
             </Card>
@@ -368,7 +397,11 @@ export function CommunityDashboard({
               <Link
                 href="/"
                 className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 text-center transition-all hover:bg-muted
-                  ${pathname === "/" ? "bg-muted text-foreground" : "text-muted-foreground"}
+                  ${
+                    pathname === "/"
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground"
+                  }
                 }`}
               >
                 <TrendingUp className="w-4 h-4" />
@@ -377,7 +410,11 @@ export function CommunityDashboard({
               <Link
                 href="/forums"
                 className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 text-center transition-all hover:bg-muted
-                  ${pathname === "/forums" ? "bg-muted text-foreground" : "text-muted-foreground"}
+                  ${
+                    pathname === "/forums"
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground"
+                  }
                 }`}
               >
                 <MessageSquare className="w-4 h-4" />
@@ -386,7 +423,11 @@ export function CommunityDashboard({
               <Link
                 href="/knowledge"
                 className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 text-center transition-all hover:bg-muted
-                  ${pathname === "/knowledge" ? "bg-muted text-foreground" : "text-muted-foreground"}
+                  ${
+                    pathname === "/knowledge"
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground"
+                  }
                 }`}
               >
                 <BookOpen className="w-4 h-4" />
@@ -395,7 +436,11 @@ export function CommunityDashboard({
               <Link
                 href="/events"
                 className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 text-center transition-all hover:bg-muted
-                  ${pathname === "/events" ? "bg-muted text-foreground" : "text-muted-foreground"}
+                  ${
+                    pathname === "/events"
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground"
+                  }
                 }`}
               >
                 <Calendar className="w-4 h-4" />
@@ -404,7 +449,11 @@ export function CommunityDashboard({
               <Link
                 href="/leaderboard"
                 className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 text-center transition-all hover:bg-muted
-                  ${pathname === "/leaderboard" ? "bg-muted text-foreground" : "text-muted-foreground"}
+                  ${
+                    pathname === "/leaderboard"
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground"
+                  }
                 }`}
               >
                 <Trophy className="w-4 h-4" />
@@ -414,7 +463,11 @@ export function CommunityDashboard({
                 <Link
                   href="/admin"
                   className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 text-center transition-all hover:bg-muted
-                    ${pathname === "/admin" ? "bg-muted text-foreground" : "text-muted-foreground"}
+                    ${
+                      pathname === "/admin"
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground"
+                    }
                   }`}
                 >
                   <Settings className="w-4 h-4" />

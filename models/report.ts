@@ -12,3 +12,4 @@ export interface IReport extends IDocument {
   status: 'pending' | 'resolved' | 'dismissed';
   priority: 'low' | 'medium' | 'high';
 }
+

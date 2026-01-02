@@ -19,7 +19,7 @@ export default function EventsPage() {
   const handleLogout = () => {
     user = null;
     localStorage.removeItem('xerago-user');
-    router.push('/login');
+    router.push('/');
   };
 
   return (
