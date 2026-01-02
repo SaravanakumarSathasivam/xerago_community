@@ -17,6 +17,8 @@ export interface IComment {
 }
 
 export interface IArticle extends IDocument {
+  id: string;
+  sku?: string;
   title: string;
   content: string;
   excerpt?: string;

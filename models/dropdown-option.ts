@@ -1,6 +1,7 @@
 import { IDocument } from './user';
 
 export interface IDropdownOption extends IDocument {
+  id: string;
   category: string;
   value: string;
   label: string;

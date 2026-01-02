@@ -42,7 +42,7 @@ export function WelcomePopup({ userName, onClose }: WelcomePopupProps) {
           <div className="text-center space-y-2">
             <h2 className="text-2xl font-bold text-balance">Welcome {userName}!</h2>
             <p className="text-muted-foreground text-pretty">
-              Great to have you back in the Xerago Martech Minds community portal.
+              Great to have you here in the Xerago Martech Minds community portal.
             </p>
           </div>
         </CardContent>

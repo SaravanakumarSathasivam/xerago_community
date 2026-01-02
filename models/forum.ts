@@ -2,15 +2,17 @@ import { IDocument, IUser } from "./user";
 import { IAttachment } from "./article";
 
 export interface IReply extends IDocument {
+  id: string;
   author: string | IUser;
   content: string;
   isEdited: boolean;
   editedAt?: Date;
-  likes: string[];
+  likes: number;
   isSolution: boolean;
 }
 
 export interface IForum extends IDocument {
+  id: string;
   title: string;
   content: string;
   author: string | IUser;

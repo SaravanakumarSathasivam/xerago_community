@@ -68,6 +68,7 @@ export interface IFeedback {
 }
 
 export interface IEvent extends IDocument {
+  id: string;
   title: string;
   description: string;
   organizer: object;

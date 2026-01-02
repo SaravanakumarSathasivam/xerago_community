@@ -370,6 +370,10 @@ export async function updateForumPostApproval(postId: string, approvalStatus: 'p
   });
 }
 
+export async function rejectForumPost(postId: string): Promise<ForumPostResponse> {
+  return request(`/api/forums/posts/${postId}/reject`, { method: "POST" });
+}
+
 // Articles
 export interface ArticlesResponse {
   success: boolean;

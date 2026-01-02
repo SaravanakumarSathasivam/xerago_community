@@ -240,8 +240,11 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
   };
 
   const onViewArticle = (article: IArticle) => {
-    if (typeof window !== "undefined")
-      window.location.href = `/knowledge/${article._id}`;
+    if (typeof window !== "undefined") {
+      // Use SKU if available, otherwise fallback to ID
+      const identifier = article.sku || article.id || article._id;
+      window.location.href = `/knowledge/${identifier}`;
+    }
   };
 
   const onEditArticle = (article: IArticle) => {
@@ -685,7 +688,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
         ) : (
           sortedArticles.map((article: IArticle) => (
             <Card
-              key={article._id}
+              key={article.id}
               className="hover:shadow-lg transition-shadow cursor-pointer"
               onClick={() => onViewArticle(article)}
             >
@@ -845,7 +848,8 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                           typeof window !== "undefined"
                             ? window.location.origin
                             : "";
-                        const url = `${origin}/knowledge/${article._id}`;
+                        const identifier = article.sku || article.id || article._id;
+                        const url = `${origin}/knowledge/${identifier}`;
                         setShareUrl(url);
                         setShareOpen(true);
                       }}

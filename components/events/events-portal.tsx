@@ -67,7 +67,7 @@ interface INewEvent {
 }
 
 interface IEditableEvent extends INewEvent {
-  _id: string;
+  id: string;
 }
 
 interface IEventCategory {
@@ -136,8 +136,8 @@ export function EventsPortal({ user }: EventsPortalProps) {
 
     const matchesTab =
       activeTab === "all" ||
-      (activeTab === "registered" && event.attendees.some((attendee: IAttendee) => attendee.user === user._id)) ||
-      (activeTab === "my-events" && (event.organizer as unknown as IUser)._id === user._id);
+      (activeTab === "registered" && event.attendees.some((attendee: IAttendee) => attendee.user === user.id)) ||
+      (activeTab === "my-events" && (event.organizer as unknown as IUser).id === user.id);
 
     return matchesCategory && matchesSearch && matchesTab;
   });
@@ -155,7 +155,7 @@ export function EventsPortal({ user }: EventsPortalProps) {
     try {
       const res = await toggleRsvp(eventId);
       const updated = res.data.event;
-      setEvents((prev) => prev.map((e: IEvent) => (e._id === updated._id ? updated : e)));
+      setEvents((prev) => prev.map((e: IEvent) => (e._id === updated.id ? updated : e)));
     } catch (e: unknown) {
       console.error("Failed to toggle RSVP:", e);
     }
@@ -261,13 +261,15 @@ export function EventsPortal({ user }: EventsPortalProps) {
     })),
   ];
 
-  const registeredEvents = events.filter((event: IEvent) => event.attendees.some((attendee: IAttendee) => attendee.user === user._id));
-  const myEvents = events.filter((event: IEvent) => (event.organizer as unknown as IUser)._id === user._id);
+  const registeredEvents = events.filter((event: IEvent) => event.attendees.some((attendee: IAttendee) => attendee.user === user.id));
+  const myEvents = events.filter((event: IEvent) => (event.organizer as unknown as IUser).id === user.id);
 
   const getEventStatus = (eventStartDate: Date, eventEndDate: Date) => {
     const now = new Date();
     if (now < eventStartDate) return "upcoming";
     if (now > eventEndDate) return "completed";
+
+    console.log(now, eventStartDate, eventEndDate);
     return "ongoing";
   };
 
@@ -281,7 +283,7 @@ export function EventsPortal({ user }: EventsPortalProps) {
 
   const openEditEvent = (event: IEvent) => {
     setEditingEvent({
-      _id: event._id!,
+      id: event.id!,
       title: event.title,
       description: event.description,
       date: new Date(event.startDate).toISOString().slice(0, 16),
@@ -298,7 +300,7 @@ export function EventsPortal({ user }: EventsPortalProps) {
   const saveEditEvent = async () => {
     if (!editingEvent) return
     try {
-      const res = await updateEvent(editingEvent._id!, {
+      const res = await updateEvent(editingEvent.id!, {
         title: editingEvent.title,
         description: editingEvent.description,
         startDate: new Date(editingEvent.date),
@@ -618,7 +620,7 @@ export function EventsPortal({ user }: EventsPortalProps) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {sortedEvents.map((event: IEvent) => (
               <Card
-                key={event._id}
+                key={event.id}
                 className="hover:shadow-lg transition-shadow"
               >
                 <CardHeader className="pb-3">
@@ -716,18 +718,18 @@ export function EventsPortal({ user }: EventsPortalProps) {
                         <Share className="w-3 h-3" />
                       </Button>
                       <Button
-                        variant={event.attendees.some((attendee: IAttendee) => attendee.user === user._id)
+                        variant={event.attendees.some((attendee: IAttendee) => attendee.user === user.id)
                           ? "outline"
                           : "default"
                         }
                         size="sm"
-                        onClick={() => handleRegister(event._id!)}
+                        onClick={() => handleRegister(event.id!)}
                         disabled={
-                          (event.attendees.some((attendee: IAttendee) => attendee.user === user._id) && getEventStatus(new Date(event.startDate), new Date(event.endDate)) === "completed") ||
+                          (event.attendees.some((attendee: IAttendee) => attendee.user === user.id) && getEventStatus(new Date(event.startDate), new Date(event.endDate)) === "completed") ||
                           event.status === "cancelled"
                         }
                       >
-                        {event.attendees.some((attendee: IAttendee) => attendee.user === user._id)
+                        {event.attendees.some((attendee: IAttendee) => attendee.user === user.id)
                           ? "Registered"
                           : "RSVP"}
                       </Button>

@@ -1,113 +1,137 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import { login as apiLogin, register as apiRegister } from "@/lib/api"
-import { verifyOtp, resendOtp } from "@/lib/api"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { IUser } from '@/models/user';
+import { useState } from "react";
+import { login as apiLogin, register as apiRegister } from "@/lib/api";
+import { verifyOtp, resendOtp } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { IUser } from "@/models/user";
 
-const departments = ["Digital Analytics", "Marketing", "CMS", "AI Engineering", "Product Management", "Design", "Sales"]
+const departments = [
+  "Digital Analytics",
+  "Marketing",
+  "CMS",
+  "AI Engineering",
+  "Product Management",
+  "Design",
+  "Sales",
+];
 
 interface LoginFormProps {
-  onLogin: (user: IUser) => void
+  onLogin: (user: IUser) => void;
 }
 
 export function LoginForm({ onLogin }: LoginFormProps) {
-  const [email, setEmail] = useState("")
-  const [name, setName] = useState("")
-  const [department, setDepartment] = useState("")
-  const [password, setPassword] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [mode, setMode] = useState<"login" | "register">("login")
-  const [error, setError] = useState("")
-  const [otpMode, setOtpMode] = useState(false)
-  const [otp, setOtp] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [department, setDepartment] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [error, setError] = useState("");
+  const [otpMode, setOtpMode] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!email || !name || !department || !password) return
+    e.preventDefault();
+    if (!email || !name || !department || !password) return;
 
-    setLoading(true)
-    setError("")
+    setLoading(true);
+    setError("");
     try {
-      const res = await apiRegister({ name, email, password, department })
-      const { token, refreshToken } = res.data
-      localStorage.setItem("xerago-token", JSON.stringify(token))
-      localStorage.setItem("xerago-refresh", JSON.stringify(refreshToken))
+      const res = await apiRegister({ name, email, password, department });
+      const { token, refreshToken } = res.data;
+      localStorage.setItem("xerago-token", JSON.stringify(token));
+      localStorage.setItem("xerago-refresh", JSON.stringify(refreshToken));
       // Prompt OTP verification
-      setOtpMode(true)
-      setMode("login")
-      setPassword("")
-      setError("")
+      setOtpMode(true);
+      setMode("login");
+      setPassword("");
+      setError("");
     } catch (err: unknown) {
-      setError((err as Error)?.message || "Registration failed")
+      setError((err as Error)?.message || "Registration failed");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!email || !password) return
+    e.preventDefault();
+    if (!email || !password) return;
 
-    setLoading(true)
-    setError("")
+    setLoading(true);
+    setError("");
     try {
-      const res = await apiLogin({ email, password })
-      const { user, token, refreshToken }: { user: IUser; token: string; refreshToken: string } = res.data
-      localStorage.setItem("xerago-token", JSON.stringify(token))
-      localStorage.setItem("xerago-refresh", JSON.stringify(refreshToken))
+      const res = await apiLogin({ email, password });
+      const {
+        user,
+        token,
+        refreshToken,
+      }: { user: IUser; token: string; refreshToken: string } = res.data;
+      localStorage.setItem("xerago-token", JSON.stringify(token));
+      localStorage.setItem("xerago-refresh", JSON.stringify(refreshToken));
       onLogin({
         ...user,
-        id: user._id,
-      })
+        id: user.id,
+      });
     } catch (err: unknown) {
-      const message = (err as Error)?.message || "Invalid email or password"
-      setError(message)
+      const message = (err as Error)?.message || "Invalid email or password";
+      setError(message);
       if (/Email not verified/i.test(message)) {
-        setOtpMode(true)
+        setOtpMode(true);
       }
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!email || !otp) return
-    setLoading(true)
-    setError("")
+    e.preventDefault();
+    if (!email || !otp) return;
+    setLoading(true);
+    setError("");
     try {
-      await verifyOtp({ email, code: otp })
-      setOtpMode(false)
-      alert("Email verified. Please sign in.")
+      await verifyOtp({ email, code: otp });
+      setOtpMode(false);
+      alert("Email verified. Please sign in.");
     } catch (err: unknown) {
-      setError((err as Error)?.message || "OTP verification failed")
+      setError((err as Error)?.message || "OTP verification failed");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleResendOtp = async () => {
-    setLoading(true)
-    setError("")
+    setLoading(true);
+    setError("");
     try {
-      await resendOtp({ email })
-      alert("OTP sent to your email")
+      await resendOtp({ email });
+      alert("OTP sent to your email");
     } catch (err: unknown) {
-      setError((err as Error)?.message || "Failed to resend OTP")
+      setError((err as Error)?.message || "Failed to resend OTP");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  const handleSubmit = mode === "register" ? handleRegister : handleLogin
+  const handleSubmit = mode === "register" ? handleRegister : handleLogin;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
@@ -115,12 +139,18 @@ export function LoginForm({ onLogin }: LoginFormProps) {
         <div className="text-center space-y-2">
           <div
             className="w-16 h-16 bg-gradient-to-r from-emerald-600 to-green-600 rounded-xl mx-auto flex items-center justify-center shadow-lg border border-emerald-500/20"
-            style={{ background: "linear-gradient(to right, #249e5e, #16a34a)" }}
+            style={{
+              background: "linear-gradient(to right, #249e5e, #16a34a)",
+            }}
           >
             <span className="text-2xl font-bold text-gray-900">XM</span>
           </div>
-          <h1 className="text-3xl font-bold text-balance">Xerago Martech Minds</h1>
-          <p className="text-muted-foreground text-pretty">Connect, collaborate, and grow with your team</p>
+          <h1 className="text-3xl font-bold text-balance">
+            Xerago Martech Minds
+          </h1>
+          <p className="text-muted-foreground text-pretty">
+            Connect, collaborate, and grow with your team
+          </p>
         </div>
 
         <Card className="border-0 shadow-xl">
@@ -135,11 +165,16 @@ export function LoginForm({ onLogin }: LoginFormProps) {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={otpMode ? handleVerifyOtp : handleSubmit} className="space-y-4">
+            <form
+              onSubmit={otpMode ? handleVerifyOtp : handleSubmit}
+              className="space-y-4"
+            >
               {otpMode && (
                 <>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Enter OTP sent to your email</label>
+                    <label className="text-sm font-medium">
+                      Enter OTP sent to your email
+                    </label>
                     <Input
                       type="text"
                       placeholder="6-digit code"
@@ -150,7 +185,12 @@ export function LoginForm({ onLogin }: LoginFormProps) {
                     />
                   </div>
                   <div className="flex justify-between">
-                    <Button type="button" variant="ghost" onClick={handleResendOtp} disabled={loading}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={handleResendOtp}
+                      disabled={loading}
+                    >
                       Resend OTP
                     </Button>
                   </div>
@@ -176,7 +216,11 @@ export function LoginForm({ onLogin }: LoginFormProps) {
                     <label htmlFor="department" className="text-sm font-medium">
                       Department
                     </label>
-                    <Select value={department} onValueChange={setDepartment} required>
+                    <Select
+                      value={department}
+                      onValueChange={setDepartment}
+                      required
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Select your department" />
                       </SelectTrigger>
@@ -207,40 +251,56 @@ export function LoginForm({ onLogin }: LoginFormProps) {
               </div>
 
               {!otpMode && (
-              <div className="space-y-2">
-                <label htmlFor="password" className="text-sm font-medium">
-                  Password
-                </label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                  <button
-                    type="button"
-                    aria-label="Toggle password visibility"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-muted-foreground"
-                  >
-                    {showPassword ? "Hide" : "Show"}
-                  </button>
+                <div className="space-y-2">
+                  <label htmlFor="password" className="text-sm font-medium">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                    <button
+                      type="button"
+                      aria-label="Toggle password visibility"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-muted-foreground"
+                    >
+                      {showPassword ? "Hide" : "Show"}
+                    </button>
+                  </div>
                 </div>
-              </div>
               )}
 
-              {error && <div className="text-sm text-red-600 bg-red-50 p-2 rounded-md">{error}</div>}
+              {error && (
+                <div className="text-sm text-red-600 bg-red-50 p-2 rounded-md">
+                  {error}
+                </div>
+              )}
 
               <Button
                 type="submit"
                 className="w-full text-gray-900 font-medium"
-                style={{ background: "linear-gradient(to right, #249e5e, #16a34a)" }}
+                style={{
+                  background: "linear-gradient(to right, #249e5e, #16a34a)",
+                }}
                 disabled={loading}
               >
-                {loading ? (otpMode ? "Verifying..." : mode === "register" ? "Creating Account..." : "Signing in...") : otpMode ? "Verify Email" : mode === "register" ? "Create Account" : "Sign In"}
+                {loading
+                  ? otpMode
+                    ? "Verifying..."
+                    : mode === "register"
+                    ? "Creating Account..."
+                    : "Signing in..."
+                  : otpMode
+                  ? "Verify Email"
+                  : mode === "register"
+                  ? "Create Account"
+                  : "Sign In"}
               </Button>
             </form>
 
@@ -249,13 +309,15 @@ export function LoginForm({ onLogin }: LoginFormProps) {
                 type="button"
                 variant="ghost"
                 onClick={() => {
-                  setMode(mode === "register" ? "login" : "register")
-                  setError("")
-                  setPassword("")
+                  setMode(mode === "register" ? "login" : "register");
+                  setError("");
+                  setPassword("");
                 }}
                 className="text-sm text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
               >
-                {mode === "register" ? "Already have an account? Sign in" : "New to Xerago? Create account"}
+                {mode === "register"
+                  ? "Already have an account? Sign in"
+                  : "New to Xerago? Create account"}
               </Button>
             </div>
           </CardContent>
@@ -270,5 +332,5 @@ export function LoginForm({ onLogin }: LoginFormProps) {
         </div>
       </div>
     </div>
-  )
+  );
 }

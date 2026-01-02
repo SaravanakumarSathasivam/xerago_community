@@ -45,6 +45,7 @@ import {
   likeForumPost,
   replyForumPost,
   likeForumReply,
+  rejectForumPost,
 } from "@/lib/api";
 import Swal from "sweetalert2";
 import { useDropdownOptions } from "@/hooks/use-dropdown-options";
@@ -66,7 +67,7 @@ interface INewForumPost {
 }
 
 interface IEditableForumPost extends INewForumPost {
-  _id: string;
+  id: string;
 }
 
 interface DiscussionForumsProps {
@@ -77,7 +78,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("");
-  const [showPendingApproval, setShowPendingApproval] = useState(false);
+  const [approvalStatusFilter, setApprovalStatusFilter] = useState<string>("all");
   const [posts, setPosts] = useState<IForum[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
 
@@ -109,7 +110,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
 
   useEffect(() => {
     fetchPosts();
-  }, [selectedCategory, searchQuery, sortBy, showPendingApproval]);
+  }, [selectedCategory, searchQuery, sortBy, approvalStatusFilter]);
 
   const fetchPosts = async () => {
     setLoadingPosts(true);
@@ -119,7 +120,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
         search: searchQuery || undefined,
         sort: sortBy,
         order: sortBy === "recent" ? "desc" : "desc",
-        approvalStatus: showPendingApproval ? "pending" : undefined,
+        approvalStatus: approvalStatusFilter !== "all" ? approvalStatusFilter : undefined,
       });
       setPosts(res.data.posts || []);
     } catch (error: unknown) {
@@ -168,9 +169,9 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
       const res = await likeForumPost(postId);
       const updated = res.data.post;
       setPosts((prev) =>
-        prev.map((p: IForum) => (p._id === updated._id ? updated : p))
+        prev.map((p: IForum) => (p.id === updated.id ? updated : p))
       );
-      if (selectedPost?._id === postId) {
+      if (selectedPost?.id === postId) {
         setSelectedPost({ ...selectedPost, ...updated });
       }
     } catch (error: unknown) {
@@ -184,7 +185,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
       const updated = res.data.post;
       setSelectedPost(updated);
       setPosts((prev) =>
-        prev.map((p: IForum) => (p._id === updated._id ? updated : p))
+        prev.map((p: IForum) => (p.id === updated.id ? updated : p))
       );
     } catch (error: unknown) {
       console.error("Failed to like reply:", error);
@@ -261,12 +262,12 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
         formData.append("attachments", file);
       });
 
-      const res = await apiUpdateForumPost(editingPost._id, formData);
+      const res = await apiUpdateForumPost(editingPost.id, formData);
       const updated = res.data.post;
       setPosts((prev) =>
-        prev.map((p: IForum) => (p._id === updated._id ? updated : p))
+        prev.map((p: IForum) => (p.id === updated.id ? updated : p))
       );
-      if (selectedPost?._id === updated._id) {
+      if (selectedPost?.id === updated.id) {
         setSelectedPost(updated);
       }
       setEditingPost(null);
@@ -292,8 +293,8 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
     if (!confirm("Are you sure you want to delete this post?")) return;
     try {
       await apiDeleteForumPost(postId);
-      setPosts((prev) => prev.filter((p: IForum) => p._id !== postId));
-      if (selectedPost?._id === postId) {
+      setPosts((prev) => prev.filter((p: IForum) => p.id !== postId));
+      if (selectedPost?.id === postId) {
         setIsViewDialogOpen(false);
         setSelectedPost(null);
       }
@@ -303,7 +304,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
   };
 
   const handleViewPost = async (post: IForum) => {
-    const fullPost = await fetchPostDetails(post._id);
+    const fullPost = await fetchPostDetails(post.id);
     if (fullPost) {
       setSelectedPost(fullPost);
       setIsViewDialogOpen(true);
@@ -313,15 +314,16 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
   const handleReply = async () => {
     if (!replyContent.trim() || !selectedPost) return;
     try {
-      const res = await replyForumPost(selectedPost._id!, {
+      const res = await replyForumPost(selectedPost.id!, {
         content: replyContent,
       });
       const updated = res.data.post;
       setSelectedPost(updated);
       setPosts((prev) =>
-        prev.map((p: IForum) => (p._id === updated._id ? updated : p))
+        prev.map((p: IForum) => (p.id === updated.id ? updated : p))
       );
       setReplyContent("");
+      setIsViewDialogOpen(false);
     } catch (error: unknown) {
       console.error("Failed to add reply:", error);
     }
@@ -351,7 +353,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
 
   const openEditDialog = (post: IForum) => {
     setEditingPost({
-      _id: post._id!,
+      id: post.id!,
       title: post.title,
       content: post.content,
       category: post.category,
@@ -384,10 +386,18 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
   };
 
   const handleRejectPost = async (postId: string) => {
+    const result = await Swal.fire({
+      icon: "warning",
+      title: "Reject Post?",
+      text: "This will mark the post as rejected. Only admins will be able to see it.",
+      showCancelButton: true,
+      confirmButtonText: "Reject",
+      confirmButtonColor: "#dc2626",
+    });
+    if (!result.isConfirmed) return;
+    
     try {
-      const rejectFormData = new FormData();
-      rejectFormData.append("approvalStatus", "rejected");
-      await apiUpdateForumPost(postId, rejectFormData);
+      await rejectForumPost(postId);
       fetchPosts();
       Swal.fire({
         icon: "success",
@@ -399,7 +409,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
       Swal.fire({
         icon: "error",
         title: "Rejection Failed",
-        text: "There was an error rejecting the post.",
+        text: (error as Error)?.message || "There was an error rejecting the post.",
       });
     }
   };
@@ -457,7 +467,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
         </Button>
         {forumCategories.map((category: IDropdownOption) => (
           <Button
-            key={category._id}
+            key={category.id}
             variant={
               selectedCategory === category.value ? "default" : "outline"
             }
@@ -494,7 +504,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
           </SelectTrigger>
           <SelectContent>
             {sortOptions.map((option: IDropdownOption) => (
-              <SelectItem key={option._id} value={option.value}>
+              <SelectItem key={option.id} value={option.value}>
                 <div className="flex items-center">
                   {option.value === "recent" && (
                     <Clock className="w-4 h-4 mr-2" />
@@ -515,14 +525,18 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
           </SelectContent>
         </Select>
         {isAdmin && (
-          <Button
-            variant={showPendingApproval ? "default" : "outline"}
-            onClick={() => setShowPendingApproval(!showPendingApproval)}
-            className="w-full sm:w-auto"
-          >
-            <Clock className="w-4 h-4 mr-2" />
-            Pending Approval
-          </Button>
+          <Select value={approvalStatusFilter} onValueChange={setApprovalStatusFilter}>
+            <SelectTrigger className="w-full sm:w-48">
+              <Filter className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Posts</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+            </SelectContent>
+          </Select>
         )}
       </div>
 
@@ -554,10 +568,11 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
             const isAuthor =
               typeof post.author === "object" &&
               post.author !== null &&
-              user?._id === post.author._id;
+              user?.id === post.author.id;
+              console.log(isAuthor, "isAuthor");
             return (
               <Card
-                key={`${post._id}-${index}`}
+                key={`${post.id}-${index}`}
                 className="hover:shadow-md transition-shadow"
               >
                 <CardHeader className="pb-3">
@@ -625,6 +640,14 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                           Pending
                         </Badge>
                       )}
+                      {post.approvalStatus === "rejected" && (
+                        <Badge
+                          variant="outline"
+                          className="text-red-600 border-red-600"
+                        >
+                          Rejected
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
@@ -678,7 +701,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleLike(post._id!)}
+                        onClick={() => handleLike(post.id!)}
                         className={post.isLiked ? "text-blue-600" : ""}
                       >
                         <ThumbsUp
@@ -710,7 +733,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleApprovePost(post._id!)}
+                            onClick={() => handleApprovePost(post.id!)}
                             className="text-green-600 hover:text-green-700 hover:bg-green-50"
                           >
                             <CheckCircle className="w-4 h-4 mr-1" />
@@ -719,7 +742,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleRejectPost(post._id!)}
+                            onClick={() => handleRejectPost(post.id!)}
                             className="text-red-600 hover:text-red-700 hover:bg-red-50"
                           >
                             <XCircle className="w-4 h-4 mr-1" />
@@ -751,7 +774,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleDeletePost(post._id!)}
+                              onClick={() => handleDeletePost(post.id!)}
                               className="text-red-600 hover:text-red-700 hover:bg-red-50"
                             >
                               <Trash2 className="w-4 h-4 mr-1" />
@@ -771,7 +794,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
 
       {/* View Post Dialog with Replies */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="lg:max-w-[80vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{selectedPost?.title}</DialogTitle>
           </DialogHeader>
@@ -851,7 +874,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleLike(selectedPost._id!)}
+                      onClick={() => handleLike(selectedPost.id!)}
                       className={selectedPost.isLiked ? "text-blue-600" : ""}
                     >
                       <ThumbsUp
@@ -872,7 +895,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                 </h3>
                 {selectedPost.replies && selectedPost.replies.length > 0 ? (
                   selectedPost.replies.map((reply: IReply) => (
-                    <Card key={reply._id}>
+                    <Card key={reply.id}>
                       <CardContent className="pt-4">
                         <div className="flex items-start space-x-3">
                           <Avatar className="w-8 h-8">
@@ -926,22 +949,22 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                               variant="ghost"
                               size="sm"
                               onClick={() =>
-                                handleLikeReply(selectedPost._id!, reply._id!)
+                                handleLikeReply(selectedPost.id!, reply.id!)
                               }
                               className={
-                                reply.likes.includes(user._id!)
+                                reply.likes > 0
                                   ? "text-blue-600"
                                   : ""
                               }
                             >
                               <ThumbsUp
                                 className={`w-3 h-3 mr-1 ${
-                                  reply.likes.includes(user._id!)
+                                  reply.likes > 0
                                     ? "fill-current"
                                     : ""
                                 }`}
                               />
-                              {reply.likes.length}
+                              {reply.likes}
                             </Button>
                           </div>
                         </div>
@@ -1024,7 +1047,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                   </SelectTrigger>
                   <SelectContent>
                     {forumCategories.map((category: IDropdownOption) => (
-                      <SelectItem key={category._id} value={category.value}>
+                      <SelectItem key={category.id} value={category.value}>
                         {category.label}
                       </SelectItem>
                     ))}
@@ -1162,7 +1185,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
                   </SelectTrigger>
                   <SelectContent>
                     {forumCategories.map((category: IDropdownOption) => (
-                      <SelectItem key={category._id} value={category.value}>
+                      <SelectItem key={category.id} value={category.value}>
                         {category.label}
                       </SelectItem>
                     ))}
