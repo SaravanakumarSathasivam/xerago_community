@@ -77,7 +77,7 @@ interface INewArticle {
 }
 
 interface IEditableArticle extends INewArticle {
-  _id: string;
+  id: string;
 }
 
 interface IArticleCategory {
@@ -88,14 +88,23 @@ interface IArticleCategory {
 
 interface KnowledgeBaseProps {
   user: IUser;
+  initialArticles: IArticle[];
+  initialLoading: boolean;
 }
 
-export function KnowledgeBase({ user }: KnowledgeBaseProps) {
+export function KnowledgeBase({
+  user,
+  initialArticles,
+  initialLoading,
+}: KnowledgeBaseProps) {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState("recent");
-  const [articles, setArticles] = useState<IArticle[]>([]);
-  const [loadingArticles, setLoadingArticles] = useState(false);
+  const [sortBy, setSortBy] = useState("");
+  const [activeTab, setActiveTab] = useState<
+    "all" | "my-articles" | "pending-approval" | "rejected"
+  >("all");
+  const [articles, setArticles] = useState<IArticle[]>(initialArticles);
+  const [loadingArticles, setLoadingArticles] = useState(initialLoading);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newArticle, setNewArticle] = useState<INewArticle>({
     title: "",
@@ -141,6 +150,12 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
       (article.tags || []).some((tag: string) =>
         tag.toLowerCase().includes(searchQuery.toLowerCase())
       );
+
+    // Client-side filtering for 'my-articles' tab
+    if (activeTab === "my-articles") {
+      return article.author.id === user.id && matchesCategory && matchesSearch;
+    }
+
     return matchesCategory && matchesSearch;
   });
 
@@ -166,7 +181,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
       const res = await likeArticle(articleId);
       const updated = res.data.article;
       setArticles((prev) =>
-        prev.map((a: IArticle) => (a._id === updated._id ? updated : a))
+        prev.map((a: IArticle) => (a.id === updated.id ? updated : a))
       );
     } catch (e: unknown) {
       console.error("Failed to like article:", e);
@@ -178,7 +193,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
       const res = await bookmarkArticle(articleId);
       const updated = res.data.article;
       setArticles((prev) =>
-        prev.map((a: IArticle) => (a._id === updated._id ? updated : a))
+        prev.map((a: IArticle) => (a.id === updated.id ? updated : a))
       );
     } catch (e: unknown) {
       console.error("Failed to bookmark article:", e);
@@ -191,6 +206,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
     if (!newArticle.content) errors.content = "Content is required";
     if (!newArticle.category) errors.category = "Category is required";
     if (!newArticle.type) errors.type = "Type is required";
+    if (!newArticle.tags) errors.tags = "Tags are required";
 
     if (Object.keys(errors).length > 0) {
       setNewArticleErrors(errors);
@@ -249,7 +265,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
 
   const onEditArticle = (article: IArticle) => {
     setEditing({
-      _id: article._id!,
+      id: article.id!,
       title: article.title,
       content: article.content,
       category: article.category,
@@ -276,7 +292,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
     setEditArticleErrors({});
 
     try {
-      const res = await updateArticle(editing._id, {
+      const res = await updateArticle(editing.id, {
         title: editing.title,
         content: editing.content,
         category: editing.category as
@@ -302,7 +318,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
       });
       const updated = res.data.article;
       setArticles((prev) =>
-        prev.map((a: IArticle) => (a._id === updated._id ? updated : a))
+        prev.map((a: IArticle) => (a.id === updated.id ? updated : a))
       );
       setEditOpen(false);
       setEditing(null);
@@ -331,10 +347,8 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
     });
     if (!result.isConfirmed) return;
     try {
-      await deleteArticle(article._id!);
-      setArticles((prev) =>
-        prev.filter((a: IArticle) => a._id !== article._id)
-      );
+      await deleteArticle(article.id!);
+      setArticles((prev) => prev.filter((a: IArticle) => a.id !== article.id));
       Swal.fire({
         icon: "success",
         title: "Deleted",
@@ -350,7 +364,9 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
   };
 
   useEffect(() => {
-    (async () => {
+    if (initialLoading) return; // Prevent re-fetching on initial load if data is already being loaded from parent
+
+    const fetchFilteredArticles = async () => {
       setLoadingArticles(true);
       try {
         const params: {
@@ -358,26 +374,61 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
           sort?: string;
           order?: "asc" | "desc";
           search?: string;
+          status?: string; // Add status parameter
         } = {};
         if (selectedCategory !== "all") params.category = selectedCategory;
         if (sortBy) {
           params.sort = sortBy;
+          params.order = "desc";
+        } else {
+          params.sort = "";
           params.order = "desc";
         }
         if (searchQuery) {
           params.search = searchQuery;
         }
 
+        // Filter by status for admin tabs
+        if (isAdmin) {
+          if (activeTab === "pending-approval") {
+            params.status = "draft";
+          } else if (activeTab === "rejected") {
+            params.status = "archived";
+          } else if (activeTab === "all" || activeTab === "my-articles") {
+            params.status = "published"; // Default to published for 'all' and 'my-articles' for admin
+          }
+        } else {
+          params.status = "published"; // Non-admins only see published articles
+        }
+
         const res = await getArticles(params);
-        const allArticles = res.data.articles || [];
-        setArticles(allArticles);
+        let fetchedArticles = res.data.articles || [];
+
+        // Frontend filter for 'my-articles'
+        if (activeTab === "my-articles") {
+          fetchedArticles = fetchedArticles.filter(
+            (article) => article.author.id === user.id
+          );
+        }
+
+        setArticles(fetchedArticles);
       } catch (e: unknown) {
         console.error("Failed to fetch articles:", e);
       } finally {
         setLoadingArticles(false);
       }
-    })();
-  }, [selectedCategory, sortBy, searchQuery, isAdmin]);
+    };
+
+    fetchFilteredArticles();
+  }, [
+    selectedCategory,
+    sortBy,
+    searchQuery,
+    isAdmin,
+    activeTab,
+    user.id,
+    initialLoading,
+  ]);
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
@@ -425,15 +476,13 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
     {
       id: "all",
       name: "All Categories",
-      count: articles.filter((a) => a.status === "published").length,
+      count: articles.length,
     },
     ...articleCategories.map((cat: IDropdownOption) => ({
       id: cat.value,
       name: cat.label,
       count: articles.filter(
-        (a: IArticle) =>
-          a.category.toLowerCase() === cat.value.toLowerCase() &&
-          a.status === "published"
+        (a: IArticle) => a.category.toLowerCase() === cat.value.toLowerCase()
       ).length,
     })),
   ];
@@ -469,7 +518,11 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                     value={newArticle.title}
                     onChange={(e) => {
                       setNewArticle({ ...newArticle, title: e.target.value });
-                      setNewArticleErrors((prev) => { delete prev.title; delete prev.apiError; return { ...prev }; });
+                      setNewArticleErrors((prev) => {
+                        delete prev.title;
+                        delete prev.apiError;
+                        return { ...prev };
+                      });
                     }}
                   />
                   {newArticleErrors.title && (
@@ -484,7 +537,11 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                     value={newArticle.category}
                     onValueChange={(value) => {
                       setNewArticle({ ...newArticle, category: value });
-                      setNewArticleErrors((prev) => { delete prev.category; delete prev.apiError; return { ...prev }; });
+                      setNewArticleErrors((prev) => {
+                        delete prev.category;
+                        delete prev.apiError;
+                        return { ...prev };
+                      });
                     }}
                   >
                     <SelectTrigger
@@ -513,26 +570,30 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium">Type</label>
-                    <Select
-                      value={newArticle.type}
-                      onValueChange={(value) => {
-                        setNewArticle({ ...newArticle, type: value });
-                        setNewArticleErrors((prev) => { delete prev.type; delete prev.apiError; return { ...prev }; });
-                      }}
+                  <Select
+                    value={newArticle.type}
+                    onValueChange={(value) => {
+                      setNewArticle({ ...newArticle, type: value });
+                      setNewArticleErrors((prev) => {
+                        delete prev.type;
+                        delete prev.apiError;
+                        return { ...prev };
+                      });
+                    }}
+                  >
+                    <SelectTrigger
+                      className={newArticleErrors.type ? "border-red-500" : ""}
                     >
-                      <SelectTrigger
-                        className={newArticleErrors.type ? "border-red-500" : ""}
-                      >
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {articleTypes.map((type: IDropdownOption) => (
-                          <SelectItem key={type._id} value={type.value}>
-                            {type.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {articleTypes.map((type: IDropdownOption) => (
+                        <SelectItem key={type._id} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {newArticleErrors.type && (
                     <p className="text-red-500 text-xs mt-1">
                       {newArticleErrors.type}
@@ -569,13 +630,41 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                   value={newArticle.content}
                   onChange={(e) => {
                     setNewArticle({ ...newArticle, content: e.target.value });
-                    setNewArticleErrors((prev) => { delete prev.content; delete prev.apiError; return { ...prev }; });
+                    setNewArticleErrors((prev) => {
+                      delete prev.content;
+                      delete prev.apiError;
+                      return { ...prev };
+                    });
                   }}
                   className={newArticleErrors.content ? "border-red-500" : ""}
                 />
                 {newArticleErrors.content && (
                   <p className="text-red-500 text-xs mt-1">
                     {newArticleErrors.content}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="text-sm font-medium">
+                  Tags (comma-separated)
+                </label>
+                <Input
+                  placeholder="e.g., AI, Marketing, Best Practices"
+                  value={newArticle.tags}
+                  onChange={(e) => {
+                    setNewArticle({ ...newArticle, tags: e.target.value });
+                    setNewArticleErrors((prev) => {
+                      delete prev.tags;
+                      delete prev.apiError;
+                      return { ...prev };
+                    });
+                  }}
+                  className={newArticleErrors.tags ? "border-red-500" : ""}
+                />
+                {newArticleErrors.tags && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {newArticleErrors.tags}
                   </p>
                 )}
               </div>
@@ -624,6 +713,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                     !newArticle.content ||
                     !newArticle.category ||
                     !newArticle.type ||
+                    !newArticle.tags ||
                     Object.keys(newArticleErrors).length > 0
                   }
                 >
@@ -639,6 +729,42 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
             </div>
           </DialogContent>
         </Dialog>
+      </div>
+
+      {/* Article Status Tabs (Admin Only) */}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant={activeTab === "all" ? "default" : "outline"}
+          onClick={() => setActiveTab("all")}
+          size="sm"
+        >
+          All Articles
+        </Button>
+        <Button
+          variant={activeTab === "my-articles" ? "default" : "outline"}
+          onClick={() => setActiveTab("my-articles")}
+          size="sm"
+        >
+          My Articles
+        </Button>
+        {isAdmin && (
+          <>
+            <Button
+              variant={activeTab === "pending-approval" ? "default" : "outline"}
+              onClick={() => setActiveTab("pending-approval")}
+              size="sm"
+            >
+              Pending Approval
+            </Button>
+            <Button
+              variant={activeTab === "rejected" ? "default" : "outline"}
+              onClick={() => setActiveTab("rejected")}
+              size="sm"
+            >
+              Rejected
+            </Button>
+          </>
+        )}
       </div>
 
       {/* Categories */}
@@ -706,13 +832,17 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                     >
                       {article.difficulty}
                     </Badge>
-                    {(isAdmin ||
-                      (typeof article.author === "object" &&
-                        article.author !== null &&
-                        user._id === article.author._id)) &&
+                    {isAdmin &&
+                      activeTab !== "all" &&
                       article.status !== "published" && (
-                        <Badge className="text-xs bg-orange-100 text-orange-700 capitalize">
-                          {article.status}
+                        <Badge
+                          className={`text-xs ${
+                            article.status === "draft"
+                              ? "bg-orange-100 text-orange-700"
+                              : "bg-red-100 text-red-700"
+                          } capitalize`}
+                        >
+                          {article.status === "draft" ? "Pending" : "Rejected"}
                         </Badge>
                       )}
                   </div>
@@ -731,7 +861,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                 <div>
                   <Button
                     variant="link"
-                    className="px-0"
+                    className="px-0 cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation();
                       onViewArticle(article);
@@ -808,7 +938,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleLike(article._id!);
+                        handleLike(article.id!);
                       }}
                       className={`p-1 h-auto ${
                         article.isLiked ? "text-blue-500" : ""
@@ -826,7 +956,7 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleBookmark(article._id!);
+                        handleBookmark(article.id!);
                       }}
                       className={`p-1 h-auto ${
                         article.isBookmarked ? "text-red-500" : ""
@@ -848,7 +978,8 @@ export function KnowledgeBase({ user }: KnowledgeBaseProps) {
                           typeof window !== "undefined"
                             ? window.location.origin
                             : "";
-                        const identifier = article.sku || article.id || article._id;
+                        const identifier =
+                          article.sku || article.id || article._id;
                         const url = `${origin}/knowledge/${identifier}`;
                         setShareUrl(url);
                         setShareOpen(true);

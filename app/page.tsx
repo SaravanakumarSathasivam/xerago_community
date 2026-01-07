@@ -14,11 +14,13 @@ import {
   Trophy,
   TrendingUp,
   Calendar,
+  Search,
 } from "lucide-react";
 import { BackToTop } from "@/components/ui/back-to-top";
 import { LogoLoader } from "@/components/ui/logo-loader";
 import { SectionLoader } from "@/components/ui/section-loader";
 import { IUser } from "@/models/user";
+import { Input } from "@/components/ui/input";
 
 interface IActivityFeedItem extends FeedItem {
   title: string;
@@ -35,6 +37,7 @@ export default function Home() {
   const [loadingFeed, setLoadingFeed] = useState(false);
   const [feedPage, setFeedPage] = useState(1);
   const [feedHasMore, setFeedHasMore] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -49,7 +52,7 @@ export default function Home() {
     (async () => {
       setLoadingFeed(true);
       try {
-        const res = await getFeed(1, 5);
+        const res = await getFeed(1, 5, searchQuery);
         setFeedActivities(res.data.items as IActivityFeedItem[]);
         setFeedPage(1);
         setFeedHasMore(res.data.page < res.data.totalPages);
@@ -59,13 +62,13 @@ export default function Home() {
         setLoadingFeed(false);
       }
     })();
-  }, []);
+  }, [searchQuery]);
 
   const loadMoreFeed = async () => {
     setLoadingFeed(true);
     try {
       const nextPage = feedPage + 1;
-      const res = await getFeed(nextPage, 5);
+      const res = await getFeed(nextPage, 5, searchQuery);
       setFeedActivities((prev) => [...prev, ...res.data.items as IActivityFeedItem[]]);
       setFeedPage(nextPage);
       setFeedHasMore(res.data.page < res.data.totalPages);
@@ -128,6 +131,15 @@ export default function Home() {
     <CommunityDashboard user={user} onLogout={handleLogout}>
       <div ref={scrollContainerRef} className="space-y-6 overflow-y-auto h-[calc(100vh-theme(spacing.16))] pr-4">
           <div className="space-y-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Input
+                placeholder="Search feed activities..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 w-full"
+              />
+            </div>
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">Community Feed</h3>
               <Badge variant="secondary">Latest Activity</Badge>

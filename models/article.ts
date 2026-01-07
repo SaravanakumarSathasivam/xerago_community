@@ -22,7 +22,7 @@ export interface IArticle extends IDocument {
   title: string;
   content: string;
   excerpt?: string;
-  author: string | IUser;
+  author: IUser;
   category: 'technology' | 'marketing' | 'analytics' | 'ai' | 'business' | 'tutorial' | 'news' | 'case-study' | 'best-practices' | 'tools';
   tags: string[];
   status: 'draft' | 'published' | 'archived';

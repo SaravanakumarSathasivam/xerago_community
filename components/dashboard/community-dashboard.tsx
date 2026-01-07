@@ -1,7 +1,4 @@
-"use client";
-
 import { useEffect, useState, ReactNode } from "react";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -16,37 +13,13 @@ import {
   Bell,
   Search,
   Plus,
-  MessageSquare,
-  Trophy,
-  BookOpen,
-  Users,
-  TrendingUp,
   LogOut,
-  Settings,
-  Calendar,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Leaderboard } from "@/components/gamification/leaderboard";
-import { AdminDashboard } from "@/components/admin/admin-dashboard";
-import { EventsPortal } from "@/components/events/events-portal";
+import { getTopContributors } from "@/lib/api";
 import { WelcomePopup } from "@/components/ui/welcome-popup";
-import { getFeed, getTopContributors, FeedItem } from "@/lib/api";
-import { formatTimestamp } from "@/helper/helper";
-import { useRouter } from "next/navigation";
-import { usePathname } from "next/navigation";
 import { IUser } from "@/models/user";
-import { IArticle } from "@/models/article";
-import { IEvent } from "@/models/event";
-import { IForum } from "@/models/forum";
-import { IAchievement } from "@/models/achievement";
-
-interface IFeedActivity extends FeedItem {
-  title: string;
-  description: string;
-  timestamp: string;
-  author: { name: string; department?: string };
-  engagement: { likes?: number; comments?: number; attendees?: number };
-}
+import { MainNavTabs } from "@/components/ui/main-nav-tabs";
 
 interface ITopContributor {
   id: string;
@@ -67,21 +40,14 @@ export function CommunityDashboard({
   onLogout,
   children,
 }: CommunityDashboardProps) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showWelcomePopup, setShowWelcomePopup] = useState(true);
-  const [lastActivity, setLastActivity] = useState<number>(Date.now());
-  const router = useRouter();
-  const pathname = usePathname();
-
   const currentUser = user
     ? user
     : JSON.parse(localStorage.getItem("xerago-user") || "{}");
 
   const isAdmin = currentUser?.role === "admin";
-
-  const [feedActivities, setFeedActivities] = useState<IFeedActivity[]>([]);
-  const [feedPage, setFeedPage] = useState(1);
-  const [feedHasMore, setFeedHasMore] = useState(true);
+  const [showWelcomePopup, setShowWelcomePopup] = useState(true);
+  const [lastActivity, setLastActivity] = useState<number>(Date.now());
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [topContributors, setTopContributors] = useState<ITopContributor[]>([]);
 
@@ -106,19 +72,6 @@ export function CommunityDashboard({
     fetchTopContributors();
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await getFeed(1, 5);
-        setFeedActivities(res.data.items as IFeedActivity[]);
-        setFeedPage(1);
-        setFeedHasMore(res.data.page < res.data.totalPages);
-      } catch (e: unknown) {
-        console.error("Failed to fetch feed activities:", e);
-      }
-    })();
-  }, []);
-
   // Minimal inactivity auto-logout (frontend)
   useEffect(() => {
     const maxIdleMs = 30 * 60 * 1000; // 30 minutes
@@ -141,62 +94,6 @@ export function CommunityDashboard({
       window.removeEventListener("click", onAnyActivity);
     };
   }, [lastActivity, onLogout]);
-
-  const loadMoreFeed = async () => {
-    try {
-      const nextPage = feedPage + 1;
-      const res = await getFeed(nextPage, 5);
-      setFeedActivities((prev) => [
-        ...prev,
-        ...(res.data.items as IFeedActivity[]),
-      ]);
-      setFeedPage(nextPage);
-      setFeedHasMore(res.data.page < res.data.totalPages);
-    } catch (e: unknown) {
-      console.error("Failed to load more feed activities:", e);
-    }
-  };
-
-  const getActivityIcon = (type: IFeedActivity["type"]) => {
-    switch (type) {
-      case "article":
-        return <BookOpen className="w-4 h-4" />;
-      case "event":
-        return <Calendar className="w-4 h-4" />;
-      case "forum":
-        return <MessageSquare className="w-4 h-4" />;
-      case "achievement":
-        return <Trophy className="w-4 h-4" />;
-      default:
-        return <TrendingUp className="w-4 h-4" />;
-    }
-  };
-
-  const getActivityColor = (type: IFeedActivity["type"]) => {
-    switch (type) {
-      case "article":
-        return "bg-emerald-100 text-emerald-700";
-      case "event":
-        return "bg-green-100 text-green-700";
-      case "forum":
-        return "bg-teal-100 text-teal-700";
-      case "achievement":
-        return "bg-yellow-100 text-yellow-700";
-      default:
-        return "bg-gray-100 text-gray-700";
-    }
-  };
-
-  useEffect(() => {
-    const tempActiveTab = localStorage.getItem("activeTab");
-    if (tempActiveTab) {
-      // setActiveTab(tempActiveTab); // This line is removed
-      localStorage.setItem("activeTab", tempActiveTab);
-    } else {
-      // setActiveTab("feed"); // This line is removed
-      localStorage.setItem("activeTab", "feed");
-    }
-  }, []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -349,9 +246,9 @@ export function CommunityDashboard({
               <CardContent className="space-y-4">
                 {topContributors.length > 0 ? (
                   <div className="space-y-3">
-                    {topContributors.map((contributor: ITopContributor) => (
+                    {topContributors.map((contributor: ITopContributor, ind: number) => (
                       <div
-                        key={contributor.id}
+                        key={`${contributor.id}-${ind}`}
                         className="flex items-center justify-between"
                       >
                         <div className="flex items-center space-x-3">
@@ -389,92 +286,7 @@ export function CommunityDashboard({
 
           {/* Main Content Area */}
           <div className="lg:col-span-3">
-            <div
-              className={`flex h-10 items-center justify-between gap-2 border-b text-sm font-medium
-                ${isAdmin ? "grid-cols-6" : "grid-cols-5"}
-              }`}
-            >
-              <Link
-                href="/"
-                className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 text-center transition-all hover:bg-muted
-                  ${
-                    pathname === "/"
-                      ? "bg-muted text-foreground"
-                      : "text-muted-foreground"
-                  }
-                }`}
-              >
-                <TrendingUp className="w-4 h-4" />
-                <span className="hidden sm:inline">Feed</span>
-              </Link>
-              <Link
-                href="/forums"
-                className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 text-center transition-all hover:bg-muted
-                  ${
-                    pathname === "/forums"
-                      ? "bg-muted text-foreground"
-                      : "text-muted-foreground"
-                  }
-                }`}
-              >
-                <MessageSquare className="w-4 h-4" />
-                <span className="hidden sm:inline">Forums</span>
-              </Link>
-              <Link
-                href="/knowledge"
-                className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 text-center transition-all hover:bg-muted
-                  ${
-                    pathname === "/knowledge"
-                      ? "bg-muted text-foreground"
-                      : "text-muted-foreground"
-                  }
-                }`}
-              >
-                <BookOpen className="w-4 h-4" />
-                <span className="hidden sm:inline">Knowledge</span>
-              </Link>
-              <Link
-                href="/events"
-                className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 text-center transition-all hover:bg-muted
-                  ${
-                    pathname === "/events"
-                      ? "bg-muted text-foreground"
-                      : "text-muted-foreground"
-                  }
-                }`}
-              >
-                <Calendar className="w-4 h-4" />
-                <span className="hidden sm:inline">Events</span>
-              </Link>
-              <Link
-                href="/leaderboard"
-                className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 text-center transition-all hover:bg-muted
-                  ${
-                    pathname === "/leaderboard"
-                      ? "bg-muted text-foreground"
-                      : "text-muted-foreground"
-                  }
-                }`}
-              >
-                <Trophy className="w-4 h-4" />
-                <span className="hidden sm:inline">Leaderboard</span>
-              </Link>
-              {isAdmin && (
-                <Link
-                  href="/admin"
-                  className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 text-center transition-all hover:bg-muted
-                    ${
-                      pathname === "/admin"
-                        ? "bg-muted text-foreground"
-                        : "text-muted-foreground"
-                    }
-                  }`}
-                >
-                  <Settings className="w-4 h-4" />
-                  <span className="hidden sm:inline">Admin</span>
-                </Link>
-              )}
-            </div>
+            <MainNavTabs isAdmin={isAdmin} />
 
             {children}
           </div>

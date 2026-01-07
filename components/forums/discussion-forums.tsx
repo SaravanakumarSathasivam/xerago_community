@@ -72,15 +72,17 @@ interface IEditableForumPost extends INewForumPost {
 
 interface DiscussionForumsProps {
   user: IUser;
+  initialPosts: IForum[];
+  initialLoading: boolean;
 }
 
-export function DiscussionForums({ user }: DiscussionForumsProps) {
+export function DiscussionForums({ user, initialPosts, initialLoading }: DiscussionForumsProps) {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("");
   const [approvalStatusFilter, setApprovalStatusFilter] = useState<string>("all");
-  const [posts, setPosts] = useState<IForum[]>([]);
-  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [posts, setPosts] = useState<IForum[]>(initialPosts);
+  const [loadingPosts, setLoadingPosts] = useState(initialLoading);
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
@@ -108,10 +110,6 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
   const { options: sortOptions, loading: sortOptionsLoading } =
     useDropdownOptions("forum_sort");
 
-  useEffect(() => {
-    fetchPosts();
-  }, [selectedCategory, searchQuery, sortBy, approvalStatusFilter]);
-
   const fetchPosts = async () => {
     setLoadingPosts(true);
     try {
@@ -129,6 +127,12 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
       setLoadingPosts(false);
     }
   };
+
+  useEffect(() => {
+    if (initialLoading) return; // Prevent re-fetching on initial load if data is already being loaded from parent
+
+    fetchPosts();
+  }, [selectedCategory, searchQuery, sortBy, approvalStatusFilter, initialLoading]);
 
   const fetchPostDetails = async (postId: string) => {
     try {
@@ -197,6 +201,7 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
     if (!newPost.title) errors.title = "Title is required";
     if (!newPost.content) errors.content = "Content is required";
     if (!newPost.category) errors.category = "Category is required";
+    if (!newPost.tags) errors.tags = "Tags are required";
 
     if (Object.keys(errors).length > 0) {
       setNewPostErrors(errors);
@@ -428,8 +433,6 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
     return date.toLocaleDateString();
   };
 
-  console.log(sortedPosts, "posts");
-
   return (
     <div className="space-y-6">
       {/* Header with Actions */}
@@ -569,7 +572,6 @@ export function DiscussionForums({ user }: DiscussionForumsProps) {
               typeof post.author === "object" &&
               post.author !== null &&
               user?.id === post.author.id;
-              console.log(isAuthor, "isAuthor");
             return (
               <Card
                 key={`${post.id}-${index}`}

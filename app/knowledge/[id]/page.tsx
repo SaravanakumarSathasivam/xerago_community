@@ -22,8 +22,8 @@ export default function KnowledgeDetailPage() {
         if (!id) return;
         const res = await getArticle(id);
         setArticle(res.data.article);
-      } catch (e: Error) {
-        setError(e?.message || "Failed to load article");
+      } catch (e: unknown) {
+        setError((e as Error)?.message || "Failed to load article");
       } finally {
         setLoading(false);
       }
@@ -37,7 +37,7 @@ export default function KnowledgeDetailPage() {
     <div className="container mx-auto p-6 max-w-4xl">
       <div className="mb-4">
         <button
-          className="text-sm text-blue-600 hover:underline"
+          className="text-sm text-blue-600 hover:underline cursor-pointer"
           onClick={() => {
             // try {
             //   const tab = sessionStorage.getItem('kb:lastTab') || 'browse';
@@ -47,7 +47,7 @@ export default function KnowledgeDetailPage() {
             // } catch {
             //   router.push('/knowledge');
             // }
-            router.push('/');
+            router.push('/knowledge');
           }}
         >
           ← Back to Knowledge

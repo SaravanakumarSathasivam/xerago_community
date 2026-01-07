@@ -78,10 +78,12 @@ interface IEventCategory {
 
 interface EventsPortalProps {
   user: IUser;
+  initialEvents: IEvent[];
+  initialLoading: boolean;
 }
 
-export function EventsPortal({ user }: EventsPortalProps) {
-  const [events, setEvents] = useState<IEvent[]>([]);
+export function EventsPortal({ user, initialEvents, initialLoading }: EventsPortalProps) {
+  const [events, setEvents] = useState<IEvent[]>(initialEvents);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("date");
@@ -111,15 +113,24 @@ export function EventsPortal({ user }: EventsPortalProps) {
   const { options: sortOptions, loading: sortOptionsLoading } = useDropdownOptions('event_sort');
 
   useEffect(() => {
-    (async () => {
+    if (initialLoading) return; // Prevent re-fetching on initial load if data is already being loaded from parent
+
+    const fetchEvents = async () => {
       try {
-        const res = await getEvents();
+        const res = await getEvents({
+          sort: sortBy,
+          order: sortBy === "date" ? "asc" : "desc",
+          category: selectedCategory === "all" ? undefined : selectedCategory,
+          search: searchQuery || undefined,
+        });
         setEvents(res.data.events || []);
       } catch (e: unknown) {
         console.error("Failed to fetch events:", e);
       }
-    })();
-  }, []);
+    };
+
+    fetchEvents();
+  }, [initialLoading, selectedCategory, searchQuery, sortBy, activeTab]);
 
   const isAdmin = user.role === "admin";
 
@@ -170,6 +181,7 @@ export function EventsPortal({ user }: EventsPortalProps) {
     if (!newEvent.location) errors.location = "Location is required";
     if (!newEvent.type) errors.type = "Type is required";
     if (!newEvent.category) errors.category = "Category is required";
+    if (!newEvent.tags) errors.tags = "Tags are required";
 
     if (Object.keys(errors).length > 0) {
       setNewEventErrors(errors);
@@ -520,10 +532,15 @@ export function EventsPortal({ user }: EventsPortalProps) {
                   <Input
                     placeholder="e.g., AI, Workshop, Hands-on"
                     value={newEvent.tags}
-                    onChange={(e) =>
-                      setNewEvent({ ...newEvent, tags: e.target.value })
-                    }
+                    onChange={(e) => {
+                      setNewEvent({ ...newEvent, tags: e.target.value });
+                      setNewEventErrors((prev) => { delete prev.tags; delete prev.apiError; return { ...prev }; });
+                    }}
+                    className={newEventErrors.tags ? "border-red-500" : ""}
                   />
+                  {newEventErrors.tags && (
+                    <p className="text-red-500 text-xs mt-1">{newEventErrors.tags}</p>
+                  )}
                 </div>
 
                 <div className="flex gap-2 pt-4 items-end">
@@ -539,6 +556,7 @@ export function EventsPortal({ user }: EventsPortalProps) {
                       !newEvent.location ||
                       !newEvent.type ||
                       !newEvent.category ||
+                      !newEvent.tags ||
                       Object.keys(newEventErrors).length > 0
                     }
                   >

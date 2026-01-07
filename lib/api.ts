@@ -286,7 +286,7 @@ export async function createForumPost(formData: FormData): Promise<ForumPostResp
     if (axiosError.response?.status === 440) {
       if (typeof window !== 'undefined') {
         try { localStorage.removeItem('xerago-token'); } catch {}
-        window.location.href = '/app/(auth)/reset-password';
+        window.location.href = '/';
       }
     }
     if (axiosError.response) {
@@ -440,7 +440,7 @@ export interface FeedResponse {
   data: { items: FeedItem[]; page: number; limit: number; total: number; totalPages: number };
 }
 
-export async function getFeed(page = 1, limit = 5): Promise<FeedResponse> {
+export async function getFeed(page = 1, limit = 5, searchQuery: string): Promise<FeedResponse> {
   return request(`/api/feed?page=${page}&limit=${limit}`, { method: "GET" });
 }
 
